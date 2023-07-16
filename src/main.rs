@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 mod command_line;
-mod ui;
+mod data;
 
 struct Ui {
     command_line: CommandLine,
