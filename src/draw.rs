@@ -1,17 +1,7 @@
-#![allow(unused_imports, unused_mut, unused_variables)]
+use std::io::Write;
 
-use std::{io::Write, time::Duration};
-
-use crossterm::{
-    cursor::{Hide, MoveTo, MoveToColumn, MoveToNextLine, RestorePosition, SavePosition, Show},
-    event::{Event, KeyCode},
-    queue,
-    style::{Color, Print, PrintStyledContent, Stylize},
-    terminal::{
-        disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
-};
+use crossterm::event::{self, Event, KeyCode};
+use crossterm::{cursor, queue, style::*, terminal};
 
 use crate::{
     command_line::CommandLine,
@@ -35,17 +25,17 @@ impl Ui {
 
     pub fn run(&self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
-        enable_raw_mode()?;
-        queue!(stdout, EnterAlternateScreen)?;
+        terminal::enable_raw_mode()?;
+        queue!(stdout, terminal::EnterAlternateScreen)?;
         loop {
             self.draw(&mut stdout)?;
-            if !self.process_event(crossterm::event::read()?)? {
+            if !self.process_event(event::read()?)? {
                 break;
             }
         }
-        queue!(stdout, LeaveAlternateScreen)?;
+        queue!(stdout, terminal::LeaveAlternateScreen)?;
         stdout.flush()?;
-        disable_raw_mode()?;
+        terminal::disable_raw_mode()?;
         Ok(())
     }
 
@@ -53,11 +43,7 @@ impl Ui {
         match event {
             Event::Key(k) => match k.code {
                 KeyCode::Char(c) => self.process_key(c)?,
-                KeyCode::Esc => {
-                    return Ok(false);
-                }
-                // personal
-                KeyCode::F(9) => {
+                KeyCode::Esc | KeyCode::F(9) => {
                     return Ok(false);
                 }
                 _ => {}
@@ -73,7 +59,11 @@ impl Ui {
 
     pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
         let page = self.stack.last().expect("stack must not be empty");
-        queue!(stdout, MoveTo(0, 0), Clear(ClearType::Purge))?;
+        queue!(
+            stdout,
+            cursor::MoveTo(0, 0),
+            terminal::Clear(terminal::ClearType::Purge)
+        )?;
         self.draw_page(page, &mut stdout)?;
         Ok(())
     }
@@ -131,7 +121,7 @@ struct NextLine;
 impl crossterm::Command for NextLine {
     fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
         Print('\n').write_ansi(f)?;
-        MoveToColumn(0).write_ansi(f)?;
+        cursor::MoveToColumn(0).write_ansi(f)?;
         Ok(())
     }
 }
