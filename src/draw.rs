@@ -1,10 +1,12 @@
 #![allow(unused_imports, unused_mut, unused_variables)]
 
+use std::{io::Write, time::Duration};
+
 use crossterm::{
     cursor::{Hide, MoveToColumn, MoveToNextLine, Show},
     queue,
     style::{Color, Print, PrintStyledContent, Stylize},
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
 use crate::{
@@ -25,6 +27,17 @@ impl Ui {
         }
     }
 
+    pub fn run(&self) -> anyhow::Result<()> {
+        let mut stdout = std::io::stdout().lock();
+        enable_raw_mode()?;
+        self.draw(&mut stdout)?;
+        stdout.flush()?;
+        std::thread::sleep(Duration::from_secs(2));
+        self.undraw(&mut stdout)?;
+        disable_raw_mode()?;
+        Ok(())
+    }
+
     pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
         let page = self.stack.last().expect("stack must not be empty");
         self.draw_page(page, &mut stdout)?;
@@ -40,7 +53,6 @@ impl Ui {
         page: &Page,
         stdout: &mut impl std::io::Write,
     ) -> Result<(), std::io::Error> {
-        queue!(stdout, NextLine)?;
         for group in &page.groups {
             self.draw_group(group, stdout)?;
         }
@@ -69,10 +81,18 @@ impl Ui {
         queue!(
             stdout,
             Print(" "),
-            Print(&button.key.0),
+            PrintStyledContent((&*button.key.0).with(Color::Grey)),
             Print(" "),
             Print(&button.description),
         )?;
+        if let data::Action::Toggle(a) = &button.action {
+            queue!(
+                stdout,
+                Print(" ("),
+                PrintStyledContent((&*a.value).with(Color::DarkGrey)),
+                Print(")")
+            )?;
+        }
         Ok(())
     }
 }
