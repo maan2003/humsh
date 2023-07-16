@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
 use crate::data::Action;
