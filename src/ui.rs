@@ -6,10 +6,10 @@ pub struct Ui {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Key(char);
+pub struct Keybind(&'static str);
 
 #[derive(Debug, Clone)]
-pub enum ButtonKind {
+pub enum Action {
     Toggle(Arg),
     Popup(Group),
     Run,
@@ -17,10 +17,9 @@ pub enum ButtonKind {
 
 #[derive(Debug, Clone)]
 pub struct Button {
-    pub key_prefix: Option<Key>,
-    pub key: Key,
+    pub key: Keybind,
     pub description: String,
-    pub kind: ButtonKind,
+    pub action: Action,
 }
 
 #[derive(Debug, Clone)]
@@ -51,22 +50,22 @@ pub fn git_push() -> Program {
             description: String::from("Commit"),
             components: vec![
                 Component::Button(Button {
-                    key_prefix: Some(Key('-')),
-                    key: Key('f'),
+                    key_prefix: Some(Keybind('-')),
+                    key: Keybind('f'),
                     description: String::from("Force with lease"),
-                    kind: ButtonKind::Toggle(Arg::new(ArgOrder::FLAG, "--force-with-lease")),
+                    action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--force-with-lease")),
                 }),
                 Component::Button(Button {
-                    key_prefix: Some(Key('-')),
-                    key: Key('F'),
+                    key_prefix: Some(Keybind('-')),
+                    key: Keybind('F'),
                     description: String::from("Force"),
-                    kind: ButtonKind::Toggle(Arg::new(ArgOrder::FLAG, "--force")),
+                    action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--force")),
                 }),
                 Component::Button(Button {
                     key_prefix: None,
-                    key: Key('p'),
+                    key: Keybind('p'),
                     description: String::from("Push"),
-                    kind: ButtonKind::Run,
+                    action: Action::Run,
                 }),
             ],
         },
