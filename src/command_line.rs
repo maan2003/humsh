@@ -28,6 +28,12 @@ impl CommandLine {
     pub fn from_args(args: BTreeSet<Arg>) -> CommandLine {
         CommandLine { args }
     }
+
+    pub fn toggle_arg(&mut self, arg: Arg) {
+        if !self.args.remove(&arg) {
+            self.args.insert(arg);
+        }
+    }
 }
 
 impl FromIterator<Arg> for CommandLine {

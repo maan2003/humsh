@@ -8,6 +8,7 @@ pub enum Action {
     Toggle(Arg),
     Popup(Page),
     Run,
+    Escape,
 }
 
 #[derive(Debug, Clone)]
