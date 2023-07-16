@@ -30,21 +30,24 @@ impl Ui {
     pub fn run(&self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
         enable_raw_mode()?;
-        self.draw(&mut stdout)?;
+        loop {
+            self.draw(&mut stdout)?;
+            if !self.process_event(crossterm::event::read()?)? {
+                break;
+            }
+        }
         stdout.flush()?;
-        std::thread::sleep(Duration::from_secs(2));
-        self.undraw(&mut stdout)?;
         disable_raw_mode()?;
         Ok(())
+    }
+
+    pub fn process_event(&self, event: crossterm::event::Event) -> crossterm::Result<bool> {
+        Ok(false)
     }
 
     pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
         let page = self.stack.last().expect("stack must not be empty");
         self.draw_page(page, &mut stdout)?;
-        Ok(())
-    }
-
-    pub fn undraw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
         Ok(())
     }
 
@@ -55,6 +58,7 @@ impl Ui {
     ) -> Result<(), std::io::Error> {
         for group in &page.groups {
             self.draw_group(group, stdout)?;
+            queue!(stdout, NextLine)?;
         }
         Ok(())
     }
@@ -69,7 +73,6 @@ impl Ui {
             self.draw_button(button, stdout)?;
             queue!(stdout, NextLine)?;
         }
-        queue!(stdout, NextLine)?;
         Ok(())
     }
 
