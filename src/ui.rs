@@ -36,8 +36,12 @@ impl Ui {
                     dbg!(&self.command_line);
                     self.enter_ui(&mut stdout)?;
                 }
-                Some(Action::Popup(_)) => todo!(),
-                Some(Action::Run) => todo!(),
+                Some(Action::Popup(page)) => self.stack.push(page),
+                Some(Action::Run) => {
+                    self.leave_ui(&mut stdout)?;
+                    self.command_line.to_std().spawn()?;
+                    break Ok(());
+                }
                 Some(Action::Escape) if self.stack.len() == 1 => {
                     self.leave_ui(&mut stdout)?;
                     break Ok(());

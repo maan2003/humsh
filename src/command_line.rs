@@ -34,6 +34,14 @@ impl CommandLine {
             self.args.insert(arg);
         }
     }
+
+    pub fn to_std(&self) -> std::process::Command {
+        let mut iter = self.args.iter();
+        let program = iter.next().expect("must have a program name");
+        let mut cmd = std::process::Command::new(program.value.clone());
+        cmd.args(iter.map(|x| x.value.clone()));
+        cmd
+    }
 }
 
 impl FromIterator<Arg> for CommandLine {
