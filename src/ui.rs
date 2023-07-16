@@ -132,10 +132,15 @@ impl Ui {
             Print(&button.description),
         )?;
         if let data::Action::Toggle(a) = &button.action {
+            let selected = self.command_line.args.contains(a);
             queue!(
                 stdout,
                 Print(" ("),
-                PrintStyledContent((&*a.value).with(Color::DarkGrey)),
+                PrintStyledContent((&*a.value).with(if selected {
+                    Color::Blue
+                } else {
+                    Color::DarkGrey
+                })),
                 Print(")")
             )?;
         }
