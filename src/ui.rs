@@ -8,11 +8,14 @@ use crate::{
     command_line::CommandLine,
     data::{self, Button, Group, Page},
 };
+use input::KeyHandler;
+
+mod input;
 
 pub struct Ui {
     command_line: CommandLine,
     stack: Vec<Page>,
-    current_keys: String,
+    key_handler: KeyHandler,
 }
 
 impl Ui {
@@ -20,7 +23,7 @@ impl Ui {
         Self {
             command_line: program.base,
             stack: vec![program.start],
-            current_keys: String::new(),
+            key_handler: KeyHandler::new(),
         }
     }
 
@@ -32,9 +35,6 @@ impl Ui {
             match self.process_event(event::read()?)? {
                 Some(Action::Toggle(arg)) => {
                     self.command_line.toggle_arg(arg);
-                    self.leave_ui(&mut stdout)?;
-                    dbg!(&self.command_line);
-                    self.enter_ui(&mut stdout)?;
                 }
                 Some(Action::Popup(page)) => self.stack.push(page),
                 Some(Action::Run) => {
@@ -68,33 +68,18 @@ impl Ui {
 
     pub fn process_event(&mut self, event: Event) -> crossterm::Result<Option<Action>> {
         match event {
-            Event::Key(k) => match k.code {
-                KeyCode::Char(c) => return self.process_key(c),
-                KeyCode::Esc | KeyCode::F(9) => {
-                    return Ok(Some(Action::Escape));
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-        Ok(None)
-    }
-
-    pub fn process_key(&mut self, key: char) -> crossterm::Result<Option<Action>> {
-        self.current_keys.push(key);
-        let page = self.stack.last().expect("stack must not be empty");
-        for b in page.groups.iter().flat_map(|x| x.buttons.iter()) {
-            if b.key.0 == self.current_keys {
-                let action = b.action.clone();
-                drop(page);
-                self.current_keys = String::new();
-                return Ok(Some(action));
-            } else if b.key.0.starts_with(&self.current_keys) {
-                return Ok(None);
+            Event::Key(key) => {
+                let page = self.stack.last().expect("stack must not be empty");
+                self.key_handler.handle_key(
+                    key,
+                    page.groups
+                        .iter()
+                        .flat_map(|x| &x.buttons)
+                        .map(|b| (b.key.clone(), b.action.clone())),
+                )
             }
+            _ => Ok(None),
         }
-        self.current_keys = String::new();
-        Ok(None)
     }
 
     pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
