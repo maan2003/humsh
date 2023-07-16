@@ -1,10 +1,5 @@
 use crate::command_line::{Arg, ArgOrder, CommandLine};
 
-pub struct Ui {
-    command_line: CommandLine,
-    active_group: Group,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(&'static str);
 
@@ -50,20 +45,17 @@ pub fn git_push() -> Program {
             description: String::from("Commit"),
             components: vec![
                 Component::Button(Button {
-                    key_prefix: Some(Keybind('-')),
-                    key: Keybind('f'),
+                    key: Keybind("-f"),
                     description: String::from("Force with lease"),
                     action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--force-with-lease")),
                 }),
                 Component::Button(Button {
-                    key_prefix: Some(Keybind('-')),
-                    key: Keybind('F'),
+                    key: Keybind("-F"),
                     description: String::from("Force"),
                     action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--force")),
                 }),
                 Component::Button(Button {
-                    key_prefix: None,
-                    key: Keybind('p'),
+                    key: Keybind("p"),
                     description: String::from("Push"),
                     action: Action::Run,
                 }),
