@@ -109,7 +109,7 @@ impl Ui {
     fn draw_group(&self, group: &Group, stdout: &mut impl std::io::Write) -> crossterm::Result<()> {
         queue!(
             stdout,
-            PrintStyledContent((&*group.description).with(Color::Cyan)),
+            PrintStyledContent((&*group.description).with(Color::Blue)),
             NextLine,
         )?;
         for button in &group.buttons {
@@ -137,7 +137,7 @@ impl Ui {
                 stdout,
                 Print(" ("),
                 PrintStyledContent((&*a.value).with(if selected {
-                    Color::Blue
+                    Color::Cyan
                 } else {
                     Color::DarkGrey
                 })),
