@@ -3,10 +3,14 @@
 use std::{io::Write, time::Duration};
 
 use crossterm::{
-    cursor::{Hide, MoveToColumn, MoveToNextLine, Show},
+    cursor::{Hide, MoveTo, MoveToColumn, MoveToNextLine, RestorePosition, SavePosition, Show},
+    event::{Event, KeyCode},
     queue,
     style::{Color, Print, PrintStyledContent, Stylize},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
 
 use crate::{
@@ -17,6 +21,7 @@ use crate::{
 pub struct Ui {
     command_line: CommandLine,
     stack: Vec<Page>,
+    current_keys: String,
 }
 
 impl Ui {
@@ -24,29 +29,51 @@ impl Ui {
         Self {
             command_line: program.base,
             stack: vec![program.start],
+            current_keys: String::new(),
         }
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
         enable_raw_mode()?;
+        queue!(stdout, EnterAlternateScreen)?;
         loop {
             self.draw(&mut stdout)?;
             if !self.process_event(crossterm::event::read()?)? {
                 break;
             }
         }
+        queue!(stdout, LeaveAlternateScreen)?;
         stdout.flush()?;
         disable_raw_mode()?;
         Ok(())
     }
 
-    pub fn process_event(&self, event: crossterm::event::Event) -> crossterm::Result<bool> {
-        Ok(false)
+    pub fn process_event(&self, event: Event) -> crossterm::Result<bool> {
+        match event {
+            Event::Key(k) => match k.code {
+                KeyCode::Char(c) => self.process_key(c)?,
+                KeyCode::Esc => {
+                    return Ok(false);
+                }
+                // personal
+                KeyCode::F(9) => {
+                    return Ok(false);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        Ok(true)
+    }
+
+    pub fn process_key(&self, key: char) -> crossterm::Result<()> {
+        Ok(())
     }
 
     pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
         let page = self.stack.last().expect("stack must not be empty");
+        queue!(stdout, MoveTo(0, 0), Clear(ClearType::Purge))?;
         self.draw_page(page, &mut stdout)?;
         Ok(())
     }
