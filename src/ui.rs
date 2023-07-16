@@ -90,6 +90,7 @@ impl Ui {
             terminal::Clear(terminal::ClearType::All)
         )?;
         self.draw_page(page, &mut stdout)?;
+        queue!(stdout, Print(self.key_handler.prefix()))?;
         stdout.flush()?;
         Ok(())
     }

@@ -12,6 +12,10 @@ impl KeyHandler {
         Self::default()
     }
 
+    pub fn prefix(&self) -> &str {
+        &self.current_keys
+    }
+
     pub fn handle_key(
         &mut self,
         key: KeyEvent,
