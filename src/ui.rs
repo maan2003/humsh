@@ -1,7 +1,5 @@
 #![allow(unused_variables)]
 
-use std::io::Write;
-
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 

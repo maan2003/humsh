@@ -3,11 +3,10 @@ use anyhow::Result;
 
 mod command_line;
 mod data;
-mod draw;
+mod ui;
 
 fn main() -> Result<()> {
     let program = data::git_push();
-    let ui = draw::Ui::new(program);
-    ui.run()?;
+    ui::Ui::new(program).run()?;
     Ok(())
 }
