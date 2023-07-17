@@ -55,12 +55,6 @@ impl Ui {
                         stdout,
                         PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
                     )?;
-                    /*
-                    self.command_line.to_std().spawn()?.wait()?;
-                    if exit {
-                        break Ok(());
-                    }
-                    */
                     let mut sock = Socket::new()?;
                     sock.send(cli)?;
                     println!("{}", sock.recv()?);
