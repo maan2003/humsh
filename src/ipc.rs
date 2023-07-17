@@ -72,29 +72,26 @@ impl Ipc for Socket {
     }
     fn recv(&mut self) -> Result<String> {
         for rawconn in self.listener.incoming() {
-            std::fs::remove_file(SOCK_ADDR)?;
             match rawconn {
                 Ok(mut conn) => {
                     let mut buf = String::new();
                     conn.read_to_string(&mut buf).unwrap();
                     return self.execute(buf);
                 }
-                Err(_) => {
-                    break;
-                }
+                Err(_) => {}
             }
         }
         Ok(String::new())
     }
 }
 
-pub fn listener() -> Result<()> {
-    let mut conn = Socket::new()?;
+pub fn listener() {
+    let mut conn = Socket::new().unwrap();
     match conn.recv() {
         Ok(cmd) => {
-            conn.send(cmd)?;
+            conn.send(cmd).unwrap();
         }
         Err(_) => {}
     };
-    Ok(())
+    std::fs::remove_file(SOCK_ADDR).unwrap();
 }
