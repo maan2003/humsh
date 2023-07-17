@@ -16,15 +16,23 @@ impl KeyHandler {
         &self.current_keys
     }
 
+    fn reset(&mut self) {
+        self.current_keys.clear();
+    }
+
     pub fn handle_key(
         &mut self,
         key: KeyEvent,
         bindings: impl Iterator<Item = (Keybind, Action)>,
     ) -> crossterm::Result<Option<Action>> {
         let key = match key.code {
-            KeyCode::Char('`') => return Ok(Some(Action::ToggleCmd)),
+            KeyCode::Char('`') => {
+                self.reset();
+                return Ok(Some(Action::ToggleCmd));
+            }
             KeyCode::Char(c) => c,
             KeyCode::Esc | KeyCode::F(9) => {
+                self.reset();
                 return Ok(Some(Action::Escape));
             }
             _ => return Ok(None),
@@ -39,7 +47,7 @@ impl KeyHandler {
                 return Ok(None);
             }
         }
-        self.current_keys = String::new();
+        self.reset();
         Ok(None)
     }
 }
