@@ -39,7 +39,18 @@ impl Ui {
                 Some(Action::Popup(page)) => self.stack.push(page),
                 Some(Action::Run) => {
                     self.leave_ui(&mut stdout)?;
-                    self.command_line.to_std().spawn()?;
+                    let cli = self
+                        .command_line
+                        .args
+                        .iter()
+                        .map(|x| &*x.value)
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    execute!(
+                        stdout,
+                        PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
+                    )?;
+                    self.command_line.to_std().spawn()?.wait()?;
                     break Ok(());
                 }
                 Some(Action::Escape) if self.stack.len() == 1 => {
