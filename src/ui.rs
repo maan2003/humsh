@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 use std::ops::ControlFlow;
 
 use crossterm::event::{self, Event};
@@ -143,15 +141,32 @@ impl Ui {
         }
     }
 
-    pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
+    pub fn draw(&self, mut stdout: impl std::io::Write) -> anyhow::Result<()> {
         queue!(
             stdout,
             cursor::MoveTo(0, 0),
             terminal::Clear(terminal::ClearType::All)
         )?;
         self.draw_page(self.currrent_page(), &mut stdout)?;
-        queue!(stdout, Print(self.key_handler.prefix()))?;
+        let (_, height) = terminal::size()?;
+        queue!(stdout, cursor::MoveTo(0, height - 2))?;
         stdout.flush()?;
+
+        self.draw_prompt(&mut stdout)?;
+        Ok(())
+    }
+
+    fn draw_prompt(&self, stdout: &mut impl std::io::Write) -> Result<(), anyhow::Error> {
+        std::process::Command::new("starship")
+            .arg("prompt")
+            .spawn()?
+            .wait()?;
+        execute!(
+            stdout,
+            Print(self.command_line().to_string()),
+            Print(" "),
+            Print(self.key_handler.prefix()),
+        )?;
         Ok(())
     }
 

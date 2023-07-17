@@ -85,6 +85,14 @@ impl CommandLine {
         cmd.args(args);
         cmd
     }
+
+    pub fn to_string(&self) -> String {
+        let mut args = Vec::new();
+        for arg in &self.args {
+            arg.value.add_to(&mut args);
+        }
+        args.join(" ")
+    }
 }
 
 impl FromIterator<Arg> for CommandLine {
