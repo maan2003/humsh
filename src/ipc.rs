@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::io::prelude::*;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const SOCK_ADDR: &str = "/tmp/humsh.sock";
 
@@ -40,29 +40,16 @@ impl Socket {
         if let Some(program) = parts.next() {
             let args: Vec<_> = parts.collect();
 
-            let child = Command::new(program).args(args).spawn();
+            let mut cmd = Command::new(program);
+            cmd.args(args);
+            cmd.stdout(Stdio::piped());
+            cmd.stderr(Stdio::piped());
 
-            match child {
-                Ok(child) => {
-                    // Wait for the child process to finish
-                    let result = child.wait_with_output();
-                    match result {
-                        Ok(status) => {
-                            // the output of the command on STDOUT
-                            // TODO: handle STDERR as well
-                            return Ok(String::from_utf8(status.stdout)?);
-                        }
-                        Err(err) => {
-                            println!("Failed to wait for child process: {}", err);
-                        }
-                    }
-                }
-                Err(err) => {
-                    println!("Failed to spawn child process: {}", err);
-                }
-            }
-        } else {
-            println!("Invalid command format");
+            let mut child = cmd.spawn()?;
+
+            let mut output = String::new();
+            child.stderr.as_mut().unwrap().read_to_string(&mut output)?;
+            return Ok(output);
         }
         Ok(String::new())
     }
