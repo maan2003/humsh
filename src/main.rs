@@ -3,6 +3,7 @@ use anyhow::Result;
 
 mod command_line;
 mod data;
+mod ipc;
 mod ui;
 
 fn main() -> Result<()> {
