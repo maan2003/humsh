@@ -60,6 +60,10 @@ impl CommandLine {
         CommandLine { args }
     }
 
+    pub fn add_arg(&mut self, arg: Arg) {
+        self.args.insert(arg);
+    }
+
     pub fn toggle_arg(&mut self, arg: Arg) {
         if !self.args.remove(&arg) {
             self.args.insert(arg);

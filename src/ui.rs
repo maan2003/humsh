@@ -15,8 +15,7 @@ use input::KeyHandler;
 mod input;
 
 pub struct Ui {
-    command_line: CommandLine,
-    stack: Vec<Page>,
+    stack: Vec<(CommandLine, Page)>,
     key_handler: KeyHandler,
     showing_cmd: bool,
 }
@@ -24,11 +23,22 @@ pub struct Ui {
 impl Ui {
     pub fn new(program: data::Program) -> Self {
         Self {
-            command_line: program.base,
-            stack: vec![program.start],
+            stack: vec![(program.base, program.start)],
             key_handler: KeyHandler::new(),
             showing_cmd: false,
         }
+    }
+
+    pub fn command_line(&self) -> &CommandLine {
+        &self.stack.last().expect("stack must not be empty").0
+    }
+
+    pub fn command_line_mut(&mut self) -> &mut CommandLine {
+        &mut self.stack.last_mut().expect("stack must not be empty").0
+    }
+
+    pub fn currrent_page(&self) -> &Page {
+        &self.stack.last().expect("stack must not be empty").1
     }
 
     pub fn run(mut self) -> anyhow::Result<()> {
@@ -62,13 +72,16 @@ impl Ui {
                 }
             }
             Action::Toggle(arg) => {
-                self.command_line.toggle_arg(arg);
+                self.command_line_mut().toggle_arg(arg);
             }
-            Action::Popup(page) => self.stack.push(page),
+            Action::Add(arg) => {
+                self.command_line_mut().add_arg(arg);
+            }
+            Action::Popup(page) => self.stack.push((self.command_line().clone(), page)),
             Action::Run { exit } => {
                 self.leave_ui(stdout)?;
                 let cli = self
-                    .command_line
+                    .command_line()
                     .args
                     .iter()
                     .map(|x| x.value.to_string())
@@ -78,7 +91,7 @@ impl Ui {
                     stdout,
                     PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
                 )?;
-                self.command_line.to_std().spawn()?.wait()?;
+                self.command_line().to_std().spawn()?.wait()?;
                 if exit {
                     return Ok(ControlFlow::Break(()));
                 }
@@ -117,7 +130,7 @@ impl Ui {
     pub fn process_event(&mut self, event: Event) -> crossterm::Result<Option<Action>> {
         match event {
             Event::Key(key) => {
-                let page = self.stack.last().expect("stack must not be empty");
+                let page = &self.stack.last().expect("stack must not be empty").1;
                 self.key_handler.handle_key(
                     key,
                     page.groups
@@ -131,13 +144,12 @@ impl Ui {
     }
 
     pub fn draw(&self, mut stdout: impl std::io::Write) -> crossterm::Result<()> {
-        let page = self.stack.last().expect("stack must not be empty");
         queue!(
             stdout,
             cursor::MoveTo(0, 0),
             terminal::Clear(terminal::ClearType::All)
         )?;
-        self.draw_page(page, &mut stdout)?;
+        self.draw_page(self.currrent_page(), &mut stdout)?;
         queue!(stdout, Print(self.key_handler.prefix()))?;
         stdout.flush()?;
         Ok(())
@@ -181,7 +193,7 @@ impl Ui {
             Print(&button.description),
         )?;
         if let data::Action::Toggle(a) = &button.action {
-            let selected = self.command_line.args.contains(a);
+            let selected = self.command_line().args.contains(a);
             queue!(
                 stdout,
                 Print(" ("),

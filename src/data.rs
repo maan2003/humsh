@@ -6,6 +6,7 @@ pub struct Keybind(pub &'static str);
 #[derive(Debug, Clone)]
 pub enum Action {
     Batch(Vec<Action>),
+    Add(Arg),
     Toggle(Arg),
     Popup(Page),
     Run { exit: bool },
@@ -99,7 +100,13 @@ pub fn git_push() -> Program {
     };
 
     Program {
-        base: CommandLine::from_iter([Arg::program("git"), Arg::subcommand("commit")]),
-        start: commit,
+        base: CommandLine::from_iter([Arg::program("git")]),
+        start: page! {
+            "Git"
+
+            group "Git Commands":
+                "c" "Commit" => Action::Batch(vec![Action::Popup(commit), Action::Add(Arg::subcommand("commit"))]),
+                "p" "Push" => Action::Batch(vec![Action::Popup(push), Action::Add(Arg::subcommand("push"))]),
+        },
     }
 }
