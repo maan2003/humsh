@@ -27,6 +27,7 @@ impl Socket {
             stdout,
             PrintStyledContent(format!("> {cmd}\n").with(Color::DarkGreen))
         )?;
+        // TODO: replace all this with a nice struct which will represent this data
         let mut parts = cmd.split_whitespace();
 
         if let Some(program) = parts.next() {
@@ -40,6 +41,8 @@ impl Socket {
                     let result = child.wait_with_output();
                     match result {
                         Ok(status) => {
+                            // the output of the command on STDOUT
+                            // TODO: handle STDERR as well
                             return Ok(String::from_utf8(status.stdout)?);
                         }
                         Err(err) => {
@@ -58,6 +61,9 @@ impl Socket {
     }
 }
 
+// Send and receive information from other processes through a Unix socket
+//
+// The socket is already predefined
 impl Ipc for Socket {
     fn send(&mut self, cmd: String) -> Result<()> {
         let mut stream = UnixStream::connect(SOCK_ADDR)?;
