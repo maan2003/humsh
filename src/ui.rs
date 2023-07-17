@@ -4,6 +4,7 @@ use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
 use crate::data::Action;
+use crate::ipc::{Ipc, Socket};
 use crate::{
     command_line::CommandLine,
     data::{self, Button, Group, Page},
@@ -54,10 +55,15 @@ impl Ui {
                         stdout,
                         PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
                     )?;
+                    /*
                     self.command_line.to_std().spawn()?.wait()?;
                     if exit {
                         break Ok(());
                     }
+                    */
+                    let mut sock = Socket::new()?;
+                    sock.send(cli)?;
+                    println!("{}", sock.recv()?);
                     self.enter_ui(&mut stdout)?;
                 }
                 Some(Action::ToggleCmd) => {
