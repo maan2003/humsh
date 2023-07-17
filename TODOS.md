@@ -1,0 +1,2 @@
+- [ ] valued arguments
+- [ ] print errors on unknown key bindings
