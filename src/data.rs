@@ -7,8 +7,9 @@ pub struct Keybind(pub &'static str);
 pub enum Action {
     Toggle(Arg),
     Popup(Page),
-    Run,
+    Run { exit: bool },
     Escape,
+    ToggleCmd,
 }
 
 #[derive(Debug, Clone)]
@@ -76,17 +77,17 @@ pub fn git_push() -> Program {
                         Button {
                             key: Keybind("p"),
                             description: String::from("origin/master"),
-                            action: Action::Run,
+                            action: Action::Run { exit: false },
                         },
                         Button {
                             key: Keybind("u"),
                             description: String::from("upstream"),
-                            action: Action::Run,
+                            action: Action::Run { exit: false },
                         },
                         Button {
                             key: Keybind("e"),
                             description: String::from("elsewhere"),
-                            action: Action::Run,
+                            action: Action::Run { exit: false },
                         },
                     ],
                 },

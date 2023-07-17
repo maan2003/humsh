@@ -16,6 +16,7 @@ pub struct Ui {
     command_line: CommandLine,
     stack: Vec<Page>,
     key_handler: KeyHandler,
+    showing_cmd: bool,
 }
 
 impl Ui {
@@ -24,6 +25,7 @@ impl Ui {
             command_line: program.base,
             stack: vec![program.start],
             key_handler: KeyHandler::new(),
+            showing_cmd: false,
         }
     }
 
@@ -31,13 +33,15 @@ impl Ui {
         let mut stdout = std::io::stdout().lock();
         self.enter_ui(&mut stdout)?;
         loop {
-            self.draw(&mut stdout)?;
+            if !self.showing_cmd {
+                self.draw(&mut stdout)?;
+            }
             match self.process_event(event::read()?)? {
                 Some(Action::Toggle(arg)) => {
                     self.command_line.toggle_arg(arg);
                 }
                 Some(Action::Popup(page)) => self.stack.push(page),
-                Some(Action::Run) => {
+                Some(Action::Run { exit }) => {
                     self.leave_ui(&mut stdout)?;
                     let cli = self
                         .command_line
@@ -51,7 +55,18 @@ impl Ui {
                         PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
                     )?;
                     self.command_line.to_std().spawn()?.wait()?;
-                    break Ok(());
+                    if exit {
+                        break Ok(());
+                    }
+                    self.enter_ui(&mut stdout)?;
+                }
+                Some(Action::ToggleCmd) => {
+                    if self.showing_cmd {
+                        execute!(stdout, terminal::EnterAlternateScreen)?;
+                    } else {
+                        execute!(stdout, terminal::LeaveAlternateScreen)?;
+                    }
+                    self.showing_cmd = !self.showing_cmd;
                 }
                 Some(Action::Escape) if self.stack.len() == 1 => {
                     self.leave_ui(&mut stdout)?;

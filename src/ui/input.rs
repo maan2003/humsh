@@ -22,6 +22,7 @@ impl KeyHandler {
         bindings: impl Iterator<Item = (Keybind, Action)>,
     ) -> crossterm::Result<Option<Action>> {
         let key = match key.code {
+            KeyCode::Char('`') => return Ok(Some(Action::ToggleCmd)),
             KeyCode::Char(c) => c,
             KeyCode::Esc | KeyCode::F(9) => {
                 return Ok(Some(Action::Escape));
