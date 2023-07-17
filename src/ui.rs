@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
 
+use std::ops::ControlFlow;
+
 use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
@@ -36,48 +38,68 @@ impl Ui {
             if !self.showing_cmd {
                 self.draw(&mut stdout)?;
             }
-            match self.process_event(event::read()?)? {
-                Some(Action::Toggle(arg)) => {
-                    self.command_line.toggle_arg(arg);
+            if let Some(action) = self.process_event(event::read()?)? {
+                if self.handle_action(action, &mut stdout)?.is_break() {
+                    break;
                 }
-                Some(Action::Popup(page)) => self.stack.push(page),
-                Some(Action::Run { exit }) => {
-                    self.leave_ui(&mut stdout)?;
-                    let cli = self
-                        .command_line
-                        .args
-                        .iter()
-                        .map(|x| x.value.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    execute!(
-                        stdout,
-                        PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
-                    )?;
-                    self.command_line.to_std().spawn()?.wait()?;
-                    if exit {
-                        break Ok(());
-                    }
-                    self.enter_ui(&mut stdout)?;
-                }
-                Some(Action::ToggleCmd) => {
-                    if self.showing_cmd {
-                        execute!(stdout, terminal::EnterAlternateScreen)?;
-                    } else {
-                        execute!(stdout, terminal::LeaveAlternateScreen)?;
-                    }
-                    self.showing_cmd = !self.showing_cmd;
-                }
-                Some(Action::Escape) if self.stack.len() == 1 => {
-                    self.leave_ui(&mut stdout)?;
-                    break Ok(());
-                }
-                Some(Action::Escape) => {
-                    self.stack.pop();
-                }
-                None => {}
             }
         }
+        self.leave_ui(&mut stdout)?;
+        Ok(())
+    }
+
+    pub fn handle_action(
+        &mut self,
+        action: Action,
+        stdout: &mut impl std::io::Write,
+    ) -> anyhow::Result<ControlFlow<()>> {
+        match action {
+            Action::Batch(actions) => {
+                for action in actions {
+                    if self.handle_action(action, stdout)?.is_break() {
+                        return Ok(ControlFlow::Break(()));
+                    }
+                }
+            }
+            Action::Toggle(arg) => {
+                self.command_line.toggle_arg(arg);
+            }
+            Action::Popup(page) => self.stack.push(page),
+            Action::Run { exit } => {
+                self.leave_ui(stdout)?;
+                let cli = self
+                    .command_line
+                    .args
+                    .iter()
+                    .map(|x| x.value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                execute!(
+                    stdout,
+                    PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
+                )?;
+                self.command_line.to_std().spawn()?.wait()?;
+                if exit {
+                    return Ok(ControlFlow::Break(()));
+                }
+                self.enter_ui(stdout)?;
+            }
+            Action::ToggleCmd => {
+                if self.showing_cmd {
+                    execute!(stdout, terminal::EnterAlternateScreen)?;
+                } else {
+                    execute!(stdout, terminal::LeaveAlternateScreen)?;
+                }
+                self.showing_cmd = !self.showing_cmd;
+            }
+            Action::Escape if self.stack.len() == 1 => {
+                return Ok(ControlFlow::Break(()));
+            }
+            Action::Escape => {
+                self.stack.pop();
+            }
+        }
+        Ok(ControlFlow::Continue(()))
     }
 
     fn enter_ui(&self, stdout: &mut impl std::io::Write) -> crossterm::Result<()> {

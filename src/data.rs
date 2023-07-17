@@ -5,6 +5,7 @@ pub struct Keybind(pub &'static str);
 
 #[derive(Debug, Clone)]
 pub enum Action {
+    Batch(Vec<Action>),
     Toggle(Arg),
     Popup(Page),
     Run { exit: bool },
