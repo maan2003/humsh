@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::{execute, style::*};
 use std::io::prelude::*;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::Command;
@@ -70,8 +69,8 @@ impl Ipc for Socket {
             match rawconn {
                 Ok(mut conn) => {
                     let mut buf = String::new();
-                    conn.read_to_string(&mut buf).unwrap();
-                    return self.execute(buf);
+                    conn.read_to_string(&mut buf)?;
+                    return Ok(buf);
                 }
                 Err(_) => {}
             }
@@ -84,7 +83,8 @@ pub fn listener() {
     let mut conn = Socket::new().unwrap();
     match conn.recv() {
         Ok(cmd) => {
-            conn.send(cmd).unwrap();
+            let output = conn.execute(cmd).unwrap();
+            conn.send(output).unwrap();
         }
         Err(_) => {}
     };
