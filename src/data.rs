@@ -61,6 +61,16 @@ fn toggle_flag(flag: &str) -> Action {
     Action::Toggle(Arg::switch(flag))
 }
 
+fn run_with_flags_esc(args: Vec<Arg>) -> Action {
+    let mut actions = Vec::new();
+    for arg in args {
+        actions.push(Action::Add(arg));
+    }
+    actions.push(Action::Run { exit: false });
+    actions.push(Action::Escape);
+    Action::Batch(actions)
+}
+
 pub fn git_push() -> Program {
     let push = page! {
         "Git Push"
@@ -91,10 +101,10 @@ pub fn git_push() -> Program {
             // "-C" "Reuse commit message" => toggle_flag("--reuse-message"),
 
         group "Actions":
-            "c" "Commit" => Action::Run { exit: false },
-            "e" "Extend" => Action::Run { exit: false },
-            "w" "Reword" => Action::Run { exit: false },
-            "a" "Amend" => Action::Run { exit: false },
+            "c" "Commit" => run_with_flags_esc(vec![]),
+            "e" "Extend" => run_with_flags_esc(vec![Arg::switch("--no-edit"), Arg::switch("--amend")]),
+            "w" "Reword" => run_with_flags_esc(vec![Arg::switch("--amend"), Arg::switch("--only"), Arg::switch("--allow-empty")]),
+            "a" "Amend" => run_with_flags_esc(vec![Arg::switch("--amend")]),
             "f" "Fixup" => Action::Run { exit: false },
             "F" "Instant Fixup" => Action::Run { exit: false },
     };
