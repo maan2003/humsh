@@ -37,61 +37,47 @@ pub struct Program {
     pub start: Page,
 }
 
+macro_rules! page {
+    ($pdesc:literal $(group $group:literal:
+        $($key:literal $desc:literal => $act:expr),+ $(,)?)+
+    ) => {
+        Page {
+            description: $pdesc.into(),
+            groups: vec![ $(
+                Group {
+                    description: $group.into(),
+                    buttons: vec![$(
+                        Button { key: Keybind($key), description: $desc.into(), action: $act, },
+                    )+]
+                },
+            )+]
+        }
+    };
+}
+
+fn toggle_flag(flag: &str) -> Action {
+    Action::Toggle(Arg::new(ArgOrder::FLAG, flag))
+}
+
 pub fn git_push() -> Program {
     Program {
         base: CommandLine::from_iter([
             Arg::new(ArgOrder::PROGRAM, "git"),
             Arg::new(ArgOrder::SUBCOMMAND, "push"),
         ]),
-        start: Page {
-            description: String::from("Push"),
-            groups: vec![
-                Group {
-                    description: String::from("Arguments"),
-                    buttons: vec![
-                        Button {
-                            key: Keybind("-f"),
-                            description: String::from("Force with lease"),
-                            action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--force-with-lease")),
-                        },
-                        Button {
-                            key: Keybind("-F"),
-                            description: String::from("Force"),
-                            action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--force")),
-                        },
-                        Button {
-                            key: Keybind("-h"),
-                            description: String::from("Disable hooks"),
-                            action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--no-verify")),
-                        },
-                        Button {
-                            key: Keybind("-n"),
-                            description: String::from("Dry run"),
-                            action: Action::Toggle(Arg::new(ArgOrder::FLAG, "--dry-run")),
-                        },
-                    ],
-                },
-                Group {
-                    description: String::from("Push to "),
-                    buttons: vec![
-                        Button {
-                            key: Keybind("p"),
-                            description: String::from("origin/master"),
-                            action: Action::Run { exit: false },
-                        },
-                        Button {
-                            key: Keybind("u"),
-                            description: String::from("upstream"),
-                            action: Action::Run { exit: false },
-                        },
-                        Button {
-                            key: Keybind("e"),
-                            description: String::from("elsewhere"),
-                            action: Action::Run { exit: false },
-                        },
-                    ],
-                },
-            ],
+        start: page! {
+            "Git Push"
+
+            group "Arguments":
+                "-f" "Force with lease" => toggle_flag("--force-with-lease"),
+                "-F" "Force" => toggle_flag("--force"),
+                "-h" "Disable hooks" => toggle_flag("--no-verify"),
+                "-n" "Dry run" => toggle_flag("--dry-run"),
+
+            group "Push to":
+                "p" "origin/master" => Action::Run { exit: false },
+                "u" "upstream" => Action::Run { exit: false },
+                "p" "elsewhere" => Action::Run { exit: false },
         },
     }
 }
