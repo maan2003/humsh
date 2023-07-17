@@ -88,14 +88,13 @@ impl Ipc for Socket {
     }
 }
 
-pub fn test() {
-    let mut conn = Socket::new().unwrap();
-    let cmd = String::from("git push");
-    conn.send(cmd).unwrap();
+pub fn listener() -> Result<()> {
+    let mut conn = Socket::new()?;
     match conn.recv() {
         Ok(cmd) => {
-            println!("{}", cmd);
+            conn.send(cmd)?;
         }
         Err(_) => {}
     };
+    Ok(())
 }
