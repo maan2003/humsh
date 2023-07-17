@@ -16,7 +16,7 @@ pub struct Socket {
 }
 
 impl Socket {
-    fn new() -> Result<Socket> {
+    pub fn new() -> Result<Socket> {
         Ok(Socket {
             listener: UnixListener::bind(SOCK_ADDR)?,
         })
