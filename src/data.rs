@@ -1,4 +1,8 @@
-use crate::command_line::{Arg, CommandLine};
+use std::{process::Stdio, sync::Arc};
+
+use anyhow::Context;
+
+use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(pub &'static str);
@@ -12,6 +16,7 @@ pub enum Action {
     Run { exit: bool },
     Escape,
     ToggleCmd,
+    RunHidingUi(Callback),
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +42,21 @@ pub struct Page {
 pub struct Program {
     pub base: CommandLine,
     pub start: Page,
+}
+
+#[derive(Clone)]
+pub struct Callback(pub Arc<dyn Fn() -> anyhow::Result<Action>>);
+
+impl Callback {
+    pub fn new(f: impl Fn() -> anyhow::Result<Action> + 'static) -> Self {
+        Callback(Arc::new(f))
+    }
+}
+
+impl std::fmt::Debug for Callback {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Callback").finish_non_exhaustive()
+    }
 }
 
 macro_rules! page {
@@ -71,6 +91,20 @@ fn run_with_flags_esc(args: Vec<Arg>) -> Action {
     Action::Batch(actions)
 }
 
+fn select_branch(extra_args: &str) -> anyhow::Result<String> {
+    let output = std::process::Command::new("bash")
+        .arg("-c")
+        .arg(format!(
+            "git branch --list {extra_args} --format '%(refname:short)' | fzf"
+        ))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .output()?;
+    let mut output_text = String::from_utf8(output.stdout)?;
+    output_text.truncate(output_text.trim_end().len());
+    Ok(output_text)
+}
+
 pub fn git_push() -> Program {
     let push = page! {
         "Git Push"
@@ -84,7 +118,18 @@ pub fn git_push() -> Program {
         group "Push to":
             "p" "origin/master" => Action::Run { exit: false },
             "u" "upstream" => Action::Run { exit: false },
-            "p" "elsewhere" => Action::Run { exit: false },
+            "e" "elsewhere" => Action::RunHidingUi(Callback::new(|| {
+                let branch = select_branch("--remote")?;
+                let (remote, branch) = branch.split_once("/").context("branch should be remote branch")?;
+                let arg = Arg::new(
+                    ArgOrder::POSITIONAL,
+                    ArgValue::Multi(vec![
+                        ArgValue::Simple(remote.to_string()),
+                        ArgValue::Simple(format!("HEAD:{branch}"))
+                    ])
+                );
+                Ok(Action::Batch(vec![Action::Add(arg), Action::Run { exit: false }, Action::Escape]))
+            })),
     };
 
     let commit = page! {

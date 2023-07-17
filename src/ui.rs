@@ -103,6 +103,12 @@ impl Ui {
                 }
                 self.showing_cmd = !self.showing_cmd;
             }
+            Action::RunHidingUi(cb) => {
+                self.leave_ui(stdout)?;
+                let ret = self.handle_action(cb.0()?, stdout)?;
+                self.enter_ui(stdout)?;
+                return Ok(ret);
+            }
             Action::Escape if self.stack.len() == 1 => {
                 return Ok(ControlFlow::Break(()));
             }
