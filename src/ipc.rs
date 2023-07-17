@@ -10,15 +10,28 @@ pub trait Ipc {
     fn recv(&mut self) -> Result<String>;
 }
 
+enum SocketType {
+    Listener,
+    Stream,
+}
+
 pub struct Socket {
-    listener: UnixListener,
+    socktype: SocketType,
+    listener: Option<UnixListener>,
 }
 
 impl Socket {
     pub fn new() -> Result<Socket> {
-        Ok(Socket {
-            listener: UnixListener::bind(SOCK_ADDR)?,
-        })
+        match UnixListener::bind(SOCK_ADDR) {
+            Ok(listener) => Ok(Socket {
+                socktype: SocketType::Listener,
+                listener: Some(listener),
+            }),
+            Err(_) => Ok(Socket {
+                socktype: SocketType::Stream,
+                listener: None,
+            }),
+        }
     }
     fn execute(&self, cmd: String) -> Result<String> {
         // TODO: replace all this with a nice struct which will represent this data
@@ -65,15 +78,28 @@ impl Ipc for Socket {
         Ok(())
     }
     fn recv(&mut self) -> Result<String> {
-        for rawconn in self.listener.incoming() {
-            match rawconn {
-                Ok(mut conn) => {
+        match self.socktype {
+            SocketType::Listener => {
+                let listener = self.listener.as_ref().unwrap();
+                for rawconn in listener.incoming() {
+                    match rawconn {
+                        Ok(mut conn) => {
+                            let mut buf = String::new();
+                            conn.read_to_string(&mut buf)?;
+                            return Ok(buf);
+                        }
+                        Err(_) => {}
+                    }
+                }
+            }
+            SocketType::Stream => match UnixStream::connect(SOCK_ADDR) {
+                Ok(mut stream) => {
                     let mut buf = String::new();
-                    conn.read_to_string(&mut buf)?;
+                    stream.read_to_string(&mut buf)?;
                     return Ok(buf);
                 }
                 Err(_) => {}
-            }
+            },
         }
         Ok(String::new())
     }
