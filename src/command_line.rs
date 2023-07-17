@@ -6,9 +6,16 @@ pub struct CommandLine {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ArgValue {
+    Simple(String),
+    Valued(String, String),
+    Multi(Vec<ArgValue>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Arg {
     pub order: ArgOrder,
-    pub value: String,
+    pub value: ArgValue,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
@@ -24,6 +31,30 @@ impl ArgOrder {
         ArgOrder(value)
     }
 }
+
+impl ArgValue {
+    pub fn add_to(&self, args: &mut Vec<String>) {
+        match self {
+            ArgValue::Simple(s) => args.push(s.clone()),
+            ArgValue::Valued(k, v) => {
+                args.push(k.clone());
+                args.push(v.clone());
+            }
+            ArgValue::Multi(m) => {
+                for a in m {
+                    a.add_to(args);
+                }
+            }
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut args = Vec::new();
+        self.add_to(&mut args);
+        args.join(" ")
+    }
+}
+
 impl CommandLine {
     pub fn from_args(args: BTreeSet<Arg>) -> CommandLine {
         CommandLine { args }
@@ -38,8 +69,16 @@ impl CommandLine {
     pub fn to_std(&self) -> std::process::Command {
         let mut iter = self.args.iter();
         let program = iter.next().expect("must have a program name");
-        let mut cmd = std::process::Command::new(program.value.clone());
-        cmd.args(iter.map(|x| x.value.clone()));
+        let program = match &program.value {
+            ArgValue::Simple(s) => s.clone(),
+            _ => panic!("program name must be a simple argument"),
+        };
+        let mut cmd = std::process::Command::new(program);
+        let mut args = Vec::new();
+        for arg in iter {
+            arg.value.add_to(&mut args);
+        }
+        cmd.args(args);
         cmd
     }
 }
@@ -51,10 +90,26 @@ impl FromIterator<Arg> for CommandLine {
 }
 
 impl Arg {
-    pub fn new(order: ArgOrder, value: impl Into<String>) -> Self {
+    pub fn new(order: ArgOrder, value: ArgValue) -> Self {
         Self {
             order,
             value: value.into(),
         }
+    }
+
+    pub fn switch(value: impl Into<String>) -> Self {
+        Arg::new(ArgOrder::FLAG, ArgValue::Simple(value.into()))
+    }
+
+    pub fn program(value: impl Into<String>) -> Self {
+        Arg::new(ArgOrder::PROGRAM, ArgValue::Simple(value.into()))
+    }
+
+    pub fn subcommand(value: impl Into<String>) -> Self {
+        Arg::new(ArgOrder::SUBCOMMAND, ArgValue::Simple(value.into()))
+    }
+
+    pub fn positional(value: impl Into<String>) -> Self {
+        Arg::new(ArgOrder::POSITIONAL, ArgValue::Simple(value.into()))
     }
 }

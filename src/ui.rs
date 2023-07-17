@@ -47,7 +47,7 @@ impl Ui {
                         .command_line
                         .args
                         .iter()
-                        .map(|x| &*x.value)
+                        .map(|x| x.value.to_string())
                         .collect::<Vec<_>>()
                         .join(" ");
                     execute!(
@@ -163,7 +163,7 @@ impl Ui {
             queue!(
                 stdout,
                 Print(" ("),
-                PrintStyledContent((&*a.value).with(if selected {
+                PrintStyledContent(a.value.to_string().with(if selected {
                     Color::Cyan
                 } else {
                     Color::DarkGrey

@@ -1,4 +1,4 @@
-use crate::command_line::{Arg, ArgOrder, CommandLine};
+use crate::command_line::{Arg, CommandLine};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(pub &'static str);
@@ -56,15 +56,12 @@ macro_rules! page {
 }
 
 fn toggle_flag(flag: &str) -> Action {
-    Action::Toggle(Arg::new(ArgOrder::FLAG, flag))
+    Action::Toggle(Arg::switch(flag))
 }
 
 pub fn git_push() -> Program {
     Program {
-        base: CommandLine::from_iter([
-            Arg::new(ArgOrder::PROGRAM, "git"),
-            Arg::new(ArgOrder::SUBCOMMAND, "push"),
-        ]),
+        base: CommandLine::from_iter([Arg::program("git"), Arg::subcommand("push")]),
         start: page! {
             "Git Push"
 
