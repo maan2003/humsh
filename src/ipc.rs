@@ -22,11 +22,6 @@ impl Socket {
         })
     }
     fn execute(&self, cmd: String) -> Result<String> {
-        let mut stdout = std::io::stdout().lock();
-        execute!(
-            stdout,
-            PrintStyledContent(format!("> {cmd}\n").with(Color::DarkGreen))
-        )?;
         // TODO: replace all this with a nice struct which will represent this data
         let mut parts = cmd.split_whitespace();
 
