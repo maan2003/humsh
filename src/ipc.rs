@@ -37,6 +37,7 @@ impl Socket {
         }
     }
     fn execute(&self, cmd: String) -> Result<()> {
+        println!("hi");
         // TODO: replace all this with a nice struct which will represent this data
         let mut parts = cmd.split_whitespace();
 
@@ -61,11 +62,9 @@ impl Ipc for Socket {
     async fn recv(&mut self) -> Result<String> {
         match self.socktype {
             SocketType::Listener => {
-                let (stream, _) = self.listener.as_ref().unwrap().accept().await?;
-                let mut conn = stream.into_std()?;
-                conn.set_nonblocking(false)?;
+                let (mut stream, _) = self.listener.as_ref().unwrap().accept().await?;
                 let mut buf = String::new();
-                conn.read_to_string(&mut buf).unwrap();
+                stream.read_to_string(&mut buf).await?;
                 return Ok(buf);
             }
             SocketType::Stream => match UnixStream::connect(SOCK_ADDR).await {
