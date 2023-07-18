@@ -110,13 +110,9 @@ impl Ui {
                 return Ok(ret);
             }
             Action::Shell => {
-                let (_, height) = terminal::size()?;
-                execute!(
-                    stdout,
-                    terminal::Clear(terminal::ClearType::All),
-                    cursor::MoveTo(0, height - 2)
-                )?;
+                self.leave_ui(stdout)?;
                 std::process::Command::new("fish").spawn()?.wait()?;
+                self.enter_ui(stdout)?;
             }
             Action::Escape if self.stack.len() == 1 => {
                 return Ok(ControlFlow::Break(()));
@@ -135,7 +131,13 @@ impl Ui {
     }
 
     fn leave_ui(&self, stdout: &mut impl std::io::Write) -> crossterm::Result<()> {
-        execute!(stdout, terminal::LeaveAlternateScreen)?;
+        // always write at end of terminal
+        let (_, height) = terminal::size()?;
+        execute!(
+            stdout,
+            terminal::LeaveAlternateScreen,
+            cursor::MoveTo(0, height - 1),
+        )?;
         terminal::disable_raw_mode()?;
         Ok(())
     }
