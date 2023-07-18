@@ -105,7 +105,41 @@ fn select_branch(extra_args: &str) -> anyhow::Result<String> {
     Ok(output_text)
 }
 
-pub fn git_push() -> Program {
+fn select_zoxide() -> anyhow::Result<String> {
+    let output = std::process::Command::new("bash")
+        .arg("-c")
+        .arg(format!("zoxide query -i"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .output()?;
+    let mut output_text = String::from_utf8(output.stdout)?;
+    output_text.truncate(output_text.trim_end().len());
+    Ok(output_text)
+}
+
+pub fn program(name: &str, page: Page) -> Action {
+    Action::Batch(vec![Action::Popup(page), Action::Add(Arg::program(name))])
+}
+
+pub fn top() -> Program {
+    Program {
+        base: CommandLine::from_iter([]),
+        start: page! {
+            "Home"
+
+            group "Commands":
+                "b" "Build" => toggle_flag("todo_build"),
+                "g" "Git" => program("git", git()),
+                "c" "Change Directory" => Action::RunHidingUi(Callback::new(|| {
+                    let dir = select_zoxide()?;
+                    std::env::set_current_dir(&dir)?;
+                    std::env::set_var("PWD", dir);
+                    Ok(Action::Batch(vec![]))
+                })),
+        },
+    }
+}
+pub fn git() -> Page {
     let push = page! {
         "Git Push"
 
@@ -154,14 +188,11 @@ pub fn git_push() -> Program {
             "F" "Instant Fixup" => Action::Run { exit: false },
     };
 
-    Program {
-        base: CommandLine::from_iter([Arg::program("git")]),
-        start: page! {
-            "Git"
+    page! {
+        "Git"
 
-            group "Git Commands":
-                "c" "Commit" => Action::Batch(vec![Action::Popup(commit), Action::Add(Arg::subcommand("commit"))]),
-                "p" "Push" => Action::Batch(vec![Action::Popup(push), Action::Add(Arg::subcommand("push"))]),
-        },
+        group "Git Commands":
+            "c" "Commit" => Action::Batch(vec![Action::Popup(commit), Action::Add(Arg::subcommand("commit"))]),
+            "p" "Push" => Action::Batch(vec![Action::Popup(push), Action::Add(Arg::subcommand("push"))]),
     }
 }

@@ -6,7 +6,7 @@ mod data;
 mod ui;
 
 fn main() -> Result<()> {
-    let program = data::git_push();
+    let program = data::top();
     ui::Ui::new(program).run()?;
     Ok(())
 }
