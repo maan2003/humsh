@@ -108,7 +108,7 @@ fn select_branch(extra_args: &str) -> anyhow::Result<String> {
 fn select_zoxide() -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
-        .arg(format!("zoxide query -i"))
+        .arg(format!("zoxide query -l | fzf"))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
