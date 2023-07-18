@@ -30,7 +30,7 @@ impl Ui {
         }
     }
 
-    pub fn run(mut self) -> anyhow::Result<()> {
+    pub async fn run(mut self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
         self.enter_ui(&mut stdout)?;
         loop {
@@ -56,8 +56,7 @@ impl Ui {
                         PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
                     )?;
                     let mut sock = Socket::new()?;
-                    sock.send(cli)?;
-                    println!("{}", sock.recv()?);
+                    sock.send(cli).await?;
                     self.enter_ui(&mut stdout)?;
                 }
                 Some(Action::ToggleCmd) => {
