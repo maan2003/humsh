@@ -148,13 +148,14 @@ impl Ui {
     }
 
     pub fn draw(&self, mut stdout: impl std::io::Write) -> anyhow::Result<()> {
+        let (_, height) = terminal::size()?;
+        // hack: to make terminal keep scrolling
         queue!(
             stdout,
-            cursor::MoveTo(0, 0),
+            cursor::MoveTo(0, height - 1),
             terminal::Clear(terminal::ClearType::All)
         )?;
         self.draw_page(self.currrent_page(), &mut stdout)?;
-        let (_, height) = terminal::size()?;
         queue!(stdout, cursor::MoveTo(0, height - 2))?;
         stdout.flush()?;
 
