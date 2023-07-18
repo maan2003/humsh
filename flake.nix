@@ -6,7 +6,7 @@
   in
   {
     devShells.${system}.default = pkgs.mkShell {
-      nativeBuildInputs = with pkgs; [ cargo rustc rustfmt rust-analyzer ];
+      nativeBuildInputs = with pkgs; [ cargo rustc rustfmt rust-analyzer starship zoxide fish fzf ];
     };
   };
 }
