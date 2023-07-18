@@ -167,10 +167,12 @@ impl Ui {
             .arg("prompt")
             .spawn()?
             .wait()?;
+
+        let cmd = self.command_line().to_string();
         execute!(
             stdout,
-            Print(self.command_line().to_string()),
-            Print(" "),
+            Print(&cmd),
+            Print(if cmd.is_empty() { "" } else { " " }),
             Print(self.key_handler.prefix()),
         )?;
         Ok(())
