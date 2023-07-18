@@ -59,6 +59,15 @@ impl std::fmt::Debug for Callback {
     }
 }
 
+impl Page {
+    pub fn empty() -> Self {
+        Self {
+            description: String::from("empty"),
+            groups: Vec::new(),
+        }
+    }
+}
+
 macro_rules! page {
     ($pdesc:literal $(group $group:literal:
         $($key:literal $desc:literal => $act:expr),+ $(,)?)+
@@ -130,6 +139,12 @@ pub fn top() -> Program {
             group "Commands":
                 "b" "Build" => toggle_flag("todo_build"),
                 "g" "Git" => program("git", git()),
+                "e" "Edit" => Action::Batch(vec![
+                    Action::Popup(Page::empty()),
+                    Action::Add(Arg::program("hx")), Action::Add(Arg::positional(".")),
+                    Action::Run { exit: false },
+                    Action::Escape,
+                ]),
                 "c" "Change Directory" => Action::RunHidingUi(Callback::new(|| {
                     let dir = select_zoxide()?;
                     std::env::set_current_dir(&dir)?;
