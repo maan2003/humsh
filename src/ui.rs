@@ -109,6 +109,15 @@ impl Ui {
                 self.enter_ui(stdout)?;
                 return Ok(ret);
             }
+            Action::Shell => {
+                let (_, height) = terminal::size()?;
+                execute!(
+                    stdout,
+                    terminal::Clear(terminal::ClearType::All),
+                    cursor::MoveTo(0, height - 2)
+                )?;
+                std::process::Command::new("fish").spawn()?.wait()?;
+            }
             Action::Escape if self.stack.len() == 1 => {
                 return Ok(ControlFlow::Break(()));
             }

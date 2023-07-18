@@ -17,6 +17,7 @@ pub enum Action {
     Escape,
     ToggleCmd,
     RunHidingUi(Callback),
+    Shell,
 }
 
 #[derive(Debug, Clone)]
@@ -151,6 +152,7 @@ pub fn top() -> Program {
                     std::env::set_var("PWD", dir);
                     Ok(Action::Batch(vec![]))
                 })),
+                "s" "Shell Command" => Action::Shell,
         },
     }
 }
