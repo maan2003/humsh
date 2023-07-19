@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::{process::Stdio, sync::Arc};
 
 use anyhow::Context as _;
@@ -152,7 +153,12 @@ pub fn top() -> Program {
                         ctx.command_line_mut().add_arg(Arg::program("git"));
                         Ok(())
                     }),
-                    button("e", "Edit", |_ctx: Context| todo!()),
+                    button("e", "Edit", |mut ctx: Context| {
+                        ctx.leave_ui()?;
+                        ctx.run_command(Command::new("hx").arg("."))?.wait()?;
+                        ctx.enter_ui()?;
+                        Ok(())
+                    }),
                     button("c", "Change Directory", |_ctx: Context| {
                         let dir = select_zoxide()?;
                         std::env::set_current_dir(&dir)?;

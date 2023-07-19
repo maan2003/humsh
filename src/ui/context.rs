@@ -1,3 +1,5 @@
+use std::process;
+
 use crossterm::{execute, terminal};
 
 use crate::{command_line::CommandLine, data::Page};
@@ -56,5 +58,12 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn run_command_line(&mut self) -> anyhow::Result<()> {
         self.ui.run_command_line(self.stdout)
+    }
+
+    pub fn run_command(
+        &mut self,
+        command: &mut process::Command,
+    ) -> anyhow::Result<process::Child> {
+        Ok(command.spawn()?)
     }
 }
