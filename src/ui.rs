@@ -1,19 +1,21 @@
 use std::io::{StdoutLock, Write};
-use std::ops::ControlFlow;
+use std::sync::Arc;
 
 use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
-use crate::data::Action;
+use crate::data::{Callback, ToggleFlag};
 use crate::{
     command_line::CommandLine,
     data::{self, Button, Group, Page},
 };
+pub use context::Context;
 use input::KeyHandler;
 
+mod context;
 mod input;
 
-type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
+pub type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 
 pub struct Ui {
     stack: Vec<(CommandLine, Page)>,
@@ -49,8 +51,16 @@ impl Ui {
             if !self.showing_cmd {
                 self.draw(&mut stdout)?;
             }
-            if let Some(action) = self.process_event(event::read()?)? {
-                if self.handle_action(action, &mut stdout)?.is_break() {
+            if let Some(callback) = self.process_event(event::read()?)? {
+                let mut exit = false;
+                let ctx = Context {
+                    stdout: &mut stdout,
+                    ui: &mut self,
+                    exit: &mut exit,
+                };
+                // FIXME proper error handling
+                callback.call(ctx)?;
+                if exit {
                     break;
                 }
             }
@@ -59,72 +69,22 @@ impl Ui {
         Ok(())
     }
 
-    pub fn handle_action(
-        &mut self,
-        action: Action,
-        stdout: Stdout,
-    ) -> anyhow::Result<ControlFlow<()>> {
-        match action {
-            Action::Batch(actions) => {
-                for action in actions {
-                    if self.handle_action(action, stdout)?.is_break() {
-                        return Ok(ControlFlow::Break(()));
-                    }
-                }
-            }
-            Action::Toggle(arg) => {
-                self.command_line_mut().toggle_arg(arg);
-            }
-            Action::Add(arg) => {
-                self.command_line_mut().add_arg(arg);
-            }
-            Action::Popup(page) => self.stack.push((self.command_line().clone(), page)),
-            Action::Run { exit } => {
-                self.leave_ui(stdout)?;
-                let cli = self
-                    .command_line()
-                    .args
-                    .iter()
-                    .map(|x| x.value.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                execute!(
-                    stdout,
-                    PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
-                )?;
-                self.command_line().to_std().spawn()?.wait()?;
-                if exit {
-                    return Ok(ControlFlow::Break(()));
-                }
-                self.enter_ui(stdout)?;
-            }
-            Action::ToggleCmd => {
-                if self.showing_cmd {
-                    execute!(stdout, terminal::EnterAlternateScreen)?;
-                } else {
-                    execute!(stdout, terminal::LeaveAlternateScreen)?;
-                }
-                self.showing_cmd = !self.showing_cmd;
-            }
-            Action::RunHidingUi(cb) => {
-                self.leave_ui(stdout)?;
-                let ret = self.handle_action(cb.0()?, stdout)?;
-                self.enter_ui(stdout)?;
-                return Ok(ret);
-            }
-            Action::Shell => {
-                self.leave_ui(stdout)?;
-                std::process::Command::new("fish").spawn()?.wait()?;
-                self.enter_ui(stdout)?;
-            }
-            Action::Escape if self.stack.len() == 1 => {
-                return Ok(ControlFlow::Break(()));
-            }
-            Action::Escape => {
-                self.stack.pop();
-            }
-        }
-        Ok(ControlFlow::Continue(()))
+    fn run_command_line(&mut self, stdout: Stdout) -> anyhow::Result<()> {
+        self.leave_ui(stdout)?;
+        let cli = self
+            .command_line()
+            .args
+            .iter()
+            .map(|x| x.value.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        execute!(
+            stdout,
+            PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
+        )?;
+        self.command_line().to_std().spawn()?.wait()?;
+        self.enter_ui(stdout)?;
+        Ok(())
     }
 
     fn enter_ui(&self, stdout: Stdout) -> crossterm::Result<()> {
@@ -145,7 +105,7 @@ impl Ui {
         Ok(())
     }
 
-    pub fn process_event(&mut self, event: Event) -> crossterm::Result<Option<Action>> {
+    pub fn process_event(&mut self, event: Event) -> crossterm::Result<Option<Arc<dyn Callback>>> {
         match event {
             Event::Key(key) => {
                 let page = &self.stack.last().expect("stack must not be empty").1;
@@ -154,7 +114,7 @@ impl Ui {
                     page.groups
                         .iter()
                         .flat_map(|x| &x.buttons)
-                        .map(|b| (b.key.clone(), b.action.clone())),
+                        .map(|b| (b.key.clone(), b.callback.clone())),
                 )
             }
             _ => Ok(None),
@@ -222,7 +182,7 @@ impl Ui {
             Print(" "),
             Print(&button.description),
         )?;
-        if let data::Action::Toggle(a) = &button.action {
+        if let Some(ToggleFlag(a)) = &button.callback.as_any().downcast_ref::<ToggleFlag>() {
             let selected = self.command_line().args.contains(a);
             queue!(
                 stdout,

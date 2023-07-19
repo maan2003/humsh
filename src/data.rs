@@ -1,30 +1,18 @@
 use std::{process::Stdio, sync::Arc};
 
-use anyhow::Context;
+use anyhow::Context as _;
 
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
+use crate::ui::Context;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(pub &'static str);
 
 #[derive(Debug, Clone)]
-pub enum Action {
-    Batch(Vec<Action>),
-    Add(Arg),
-    Toggle(Arg),
-    Popup(Page),
-    Run { exit: bool },
-    Escape,
-    ToggleCmd,
-    RunHidingUi(Callback),
-    Shell,
-}
-
-#[derive(Debug, Clone)]
 pub struct Button {
     pub key: Keybind,
     pub description: String,
-    pub action: Action,
+    pub callback: Arc<dyn Callback>,
 }
 
 #[derive(Debug, Clone)]
@@ -45,18 +33,27 @@ pub struct Program {
     pub start: Page,
 }
 
-#[derive(Clone)]
-pub struct Callback(pub Arc<dyn Fn() -> anyhow::Result<Action>>);
+pub trait Callback {
+    fn call(&self, ctx: Context<'_, '_>) -> anyhow::Result<()>;
+    fn as_any(&self) -> &dyn std::any::Any;
+}
 
-impl Callback {
-    pub fn new(f: impl Fn() -> anyhow::Result<Action> + 'static) -> Self {
-        Callback(Arc::new(f))
+impl std::fmt::Debug for dyn Callback {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Callback").finish_non_exhaustive()
     }
 }
 
-impl std::fmt::Debug for Callback {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Callback").finish_non_exhaustive()
+impl<F> Callback for F
+where
+    F: Fn(Context) -> anyhow::Result<()> + 'static,
+{
+    fn call(&self, ctx: Context<'_, '_>) -> anyhow::Result<()> {
+        self(ctx)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self as _
     }
 }
 
@@ -79,26 +76,12 @@ macro_rules! page {
                 Group {
                     description: $group.into(),
                     buttons: vec![$(
-                        Button { key: Keybind($key), description: $desc.into(), action: $act, },
+                        Button { key: Keybind($key), description: $desc.into(), callback: Arc::new($act), },
                     )+]
                 },
             )+]
         }
     };
-}
-
-fn toggle_flag(flag: &str) -> Action {
-    Action::Toggle(Arg::switch(flag))
-}
-
-fn run_with_flags_esc(args: Vec<Arg>) -> Action {
-    let mut actions = Vec::new();
-    for arg in args {
-        actions.push(Action::Add(arg));
-    }
-    actions.push(Action::Run { exit: false });
-    actions.push(Action::Escape);
-    Action::Batch(actions)
 }
 
 fn select_branch(extra_args: &str) -> anyhow::Result<String> {
@@ -127,8 +110,20 @@ fn select_zoxide() -> anyhow::Result<String> {
     Ok(output_text)
 }
 
-pub fn program(name: &str, page: Page) -> Action {
-    Action::Batch(vec![Action::Popup(page), Action::Add(Arg::program(name))])
+pub struct ToggleFlag(pub Arg);
+
+impl Callback for ToggleFlag {
+    fn call(&self, mut ctx: Context<'_, '_>) -> anyhow::Result<()> {
+        ctx.command_line_mut().add_arg(self.0.clone());
+        Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self as _
+    }
+}
+fn toggle_flag(flag: &str) -> ToggleFlag {
+    ToggleFlag(Arg::switch(flag))
 }
 
 pub fn top() -> Program {
@@ -139,20 +134,26 @@ pub fn top() -> Program {
 
             group "Commands":
                 "b" "Build" => toggle_flag("todo_build"),
-                "g" "Git" => program("git", git()),
-                "e" "Edit" => Action::Batch(vec![
-                    Action::Popup(Page::empty()),
-                    Action::Add(Arg::program("hx")), Action::Add(Arg::positional(".")),
-                    Action::Run { exit: false },
-                    Action::Escape,
-                ]),
-                "c" "Change Directory" => Action::RunHidingUi(Callback::new(|| {
+                "g" "Git" => |mut ctx: Context| {
+                    ctx.push_page(git());
+                    ctx.command_line_mut().add_arg(Arg::program("git"));
+                    Ok(())
+                },
+                "e" "Edit" => |_: Context| {
+                    todo!();
+                },
+                "c" "Change Directory" => |_ctx: Context| {
                     let dir = select_zoxide()?;
                     std::env::set_current_dir(&dir)?;
                     std::env::set_var("PWD", dir);
-                    Ok(Action::Batch(vec![]))
-                })),
-                "s" "Shell Command" => Action::Shell,
+                    Ok(())
+                },
+                "s" "Shell Command" => |mut ctx: Context| {
+                    ctx.leave_ui()?;
+                    std::process::Command::new("fish").spawn()?.wait()?;
+                    ctx.enter_ui()?;
+                    Ok(())
+                },
         },
     }
 }
@@ -167,9 +168,9 @@ pub fn git() -> Page {
             "-n" "Dry run" => toggle_flag("--dry-run"),
 
         group "Push to":
-            "p" "origin/master" => Action::Run { exit: false },
-            "u" "upstream" => Action::Run { exit: false },
-            "e" "elsewhere" => Action::RunHidingUi(Callback::new(|| {
+            "p" "origin/master" => |mut ctx: Context| ctx.run_command_line(),
+            "u" "upstream" => |mut ctx: Context| ctx.run_command_line(),
+            "e" "elsewhere" => |mut ctx: Context| {
                 let branch = select_branch("--remote")?;
                 let (remote, branch) = branch.split_once("/").context("branch should be remote branch")?;
                 let arg = Arg::new(
@@ -179,10 +180,21 @@ pub fn git() -> Page {
                         ArgValue::Simple(format!("HEAD:{branch}"))
                     ])
                 );
-                Ok(Action::Batch(vec![Action::Add(arg), Action::Run { exit: false }, Action::Escape]))
-            })),
+                ctx.command_line_mut().add_arg(arg);
+                ctx.run_command_line()?;
+                Ok(())
+            },
     };
 
+    let run_with_args = |args: Vec<Arg>| {
+        move |mut ctx: Context| {
+            for arg in &args {
+                ctx.command_line_mut().add_arg(arg.clone());
+            }
+            ctx.run_command_line()?;
+            Ok(())
+        }
+    };
     let commit = page! {
         "Git Commit"
 
@@ -197,19 +209,27 @@ pub fn git() -> Page {
             // "-C" "Reuse commit message" => toggle_flag("--reuse-message"),
 
         group "Actions":
-            "c" "Commit" => run_with_flags_esc(vec![]),
-            "e" "Extend" => run_with_flags_esc(vec![Arg::switch("--no-edit"), Arg::switch("--amend")]),
-            "w" "Reword" => run_with_flags_esc(vec![Arg::switch("--amend"), Arg::switch("--only"), Arg::switch("--allow-empty")]),
-            "a" "Amend" => run_with_flags_esc(vec![Arg::switch("--amend")]),
-            "f" "Fixup" => Action::Run { exit: false },
-            "F" "Instant Fixup" => Action::Run { exit: false },
+            "c" "Commit" => run_with_args(vec![]),
+            "e" "Extend" => run_with_args(vec![Arg::switch("--no-edit"), Arg::switch("--amend")]),
+            "w" "Reword" => run_with_args(vec![Arg::switch("--amend"), Arg::switch("--only"), Arg::switch("--allow-empty")]),
+            "a" "Amend" => run_with_args(vec![Arg::switch("--amend")]),
+            "f" "Fixup" => run_with_args(vec![]),
+            "F" "Instant Fixup" => run_with_args(vec![]),
     };
 
     page! {
         "Git"
 
         group "Git Commands":
-            "c" "Commit" => Action::Batch(vec![Action::Popup(commit), Action::Add(Arg::subcommand("commit"))]),
-            "p" "Push" => Action::Batch(vec![Action::Popup(push), Action::Add(Arg::subcommand("push"))]),
+            "c" "Commit" => move |mut ctx: Context| {
+                ctx.push_page(commit.clone());
+                ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
+                Ok(())
+            },
+            "p" "Push" => move |mut ctx: Context| {
+                ctx.push_page(push.clone());
+                ctx.command_line_mut().add_arg(Arg::subcommand("push"));
+                Ok(())
+            },
     }
 }

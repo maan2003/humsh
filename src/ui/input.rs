@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::data::{Action, Keybind};
+use crate::data::{Callback, Keybind};
+
+use super::Context;
 
 #[derive(Debug, Clone, Default)]
 pub struct KeyHandler {
@@ -23,17 +27,22 @@ impl KeyHandler {
     pub fn handle_key(
         &mut self,
         key: KeyEvent,
-        bindings: impl Iterator<Item = (Keybind, Action)>,
-    ) -> crossterm::Result<Option<Action>> {
+        bindings: impl Iterator<Item = (Keybind, Arc<dyn Callback>)>,
+    ) -> crossterm::Result<Option<Arc<dyn Callback>>> {
         let key = match key.code {
             KeyCode::Char('`') => {
                 self.reset();
-                return Ok(Some(Action::ToggleCmd));
+                return Ok(Some(Arc::new(|mut ctx: Context| ctx.toggle_cmd())));
             }
             KeyCode::Char(c) => c,
             KeyCode::Esc | KeyCode::F(9) => {
                 self.reset();
-                return Ok(Some(Action::Escape));
+                return Ok(Some(Arc::new(|mut ctx: Context| {
+                    if !ctx.pop_page() {
+                        ctx.exit();
+                    }
+                    Ok(())
+                })));
             }
             _ => return Ok(None),
         };
