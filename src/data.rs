@@ -164,7 +164,8 @@ pub fn top() -> Program {
                     }),
                     button("s", "Shell Command", |mut ctx: Context| {
                         ctx.leave_ui()?;
-                        std::process::Command::new("fish").spawn()?.wait()?;
+                        let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
+                        std::process::Command::new(shell).spawn()?.wait()?;
                         ctx.enter_ui()?;
                         Ok(())
                     }),
