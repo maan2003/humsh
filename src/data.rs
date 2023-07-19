@@ -159,11 +159,8 @@ pub fn top() -> Program {
                         ctx.enter_ui()?;
                         Ok(())
                     }),
-                    button("c", "Change Directory", |_ctx: Context| {
-                        let dir = select_zoxide()?;
-                        std::env::set_current_dir(&dir)?;
-                        std::env::set_var("PWD", dir);
-                        Ok(())
+                    button("c", "Change Directory", |mut ctx: Context| {
+                        ctx.change_dir(select_zoxide()?)
                     }),
                     button("s", "Shell Command", |mut ctx: Context| {
                         ctx.leave_ui()?;

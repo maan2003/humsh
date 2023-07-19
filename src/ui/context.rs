@@ -1,4 +1,4 @@
-use std::process;
+use std::{path::Path, process};
 
 use crossterm::{execute, terminal};
 
@@ -54,6 +54,12 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn exit(&mut self) {
         *self.exit = true;
+    }
+
+    pub fn change_dir(&mut self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        std::env::set_current_dir(&path)?;
+        std::env::set_var("PWD", path.as_ref());
+        Ok(())
     }
 
     pub fn run_command_line(&mut self) -> anyhow::Result<()> {
