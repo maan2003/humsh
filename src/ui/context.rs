@@ -33,7 +33,11 @@ impl<'a, 'b> Context<'a, 'b> {
 
     /// Returns whether page was poped.
     pub fn pop_page(&mut self) -> bool {
-        self.ui.stack.pop().is_some()
+        if self.ui.stack.len() > 1 {
+            self.ui.stack.pop().is_some()
+        } else {
+            false
+        }
     }
 
     pub fn toggle_cmd(&mut self) -> anyhow::Result<()> {
