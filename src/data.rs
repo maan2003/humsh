@@ -66,24 +66,6 @@ impl Page {
     }
 }
 
-macro_rules! page {
-    ($pdesc:literal $(group $group:literal:
-        $($key:literal $desc:literal => $act:expr),+ $(,)?)+
-    ) => {
-        Page {
-            description: $pdesc.into(),
-            groups: vec![ $(
-                Group {
-                    description: $group.into(),
-                    buttons: vec![$(
-                        Button { key: Keybind($key), description: $desc.into(), callback: Arc::new($act), },
-                    )+]
-                },
-            )+]
-        }
-    };
-}
-
 fn select_branch(extra_args: &str) -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
@@ -126,65 +108,109 @@ fn toggle_flag(flag: &str) -> ToggleFlag {
     ToggleFlag(Arg::switch(flag))
 }
 
+pub fn page(description: impl Into<String>, groups: impl Into<Vec<Group>>) -> Page {
+    Page {
+        description: description.into(),
+        groups: groups.into(),
+    }
+}
+
+pub fn group(description: impl Into<String>, buttons: impl Into<Vec<Button>>) -> Group {
+    Group {
+        description: description.into(),
+        buttons: buttons.into(),
+    }
+}
+
+pub fn button(
+    key: &'static str,
+    description: impl Into<String>,
+    callback: impl Callback + 'static,
+) -> Button {
+    Button {
+        key: Keybind(key.into()),
+        description: description.into(),
+        callback: Arc::new(callback),
+    }
+}
+
+pub fn flag_button(key: &'static str, description: &str, flag: &str) -> Button {
+    button(key, description, ToggleFlag(Arg::switch(flag)))
+}
+
 pub fn top() -> Program {
     Program {
         base: CommandLine::from_iter([]),
-        start: page! {
-            "Home"
-
-            group "Commands":
-                "b" "Build" => toggle_flag("todo_build"),
-                "g" "Git" => |mut ctx: Context| {
-                    ctx.push_page(git());
-                    ctx.command_line_mut().add_arg(Arg::program("git"));
-                    Ok(())
-                },
-                "e" "Edit" => |_: Context| {
-                    todo!();
-                },
-                "c" "Change Directory" => |_ctx: Context| {
-                    let dir = select_zoxide()?;
-                    std::env::set_current_dir(&dir)?;
-                    std::env::set_var("PWD", dir);
-                    Ok(())
-                },
-                "s" "Shell Command" => |mut ctx: Context| {
-                    ctx.leave_ui()?;
-                    std::process::Command::new("fish").spawn()?.wait()?;
-                    ctx.enter_ui()?;
-                    Ok(())
-                },
-        },
+        start: page(
+            "Home",
+            [group(
+                "Commands",
+                [
+                    button("b", "Build", toggle_flag("todo build")),
+                    button("g", "Git", |mut ctx: Context| {
+                        ctx.push_page(git());
+                        ctx.command_line_mut().add_arg(Arg::program("git"));
+                        Ok(())
+                    }),
+                    button("e", "Edit", |_ctx: Context| todo!()),
+                    button("c", "Change Directory", |_ctx: Context| {
+                        let dir = select_zoxide()?;
+                        std::env::set_current_dir(&dir)?;
+                        std::env::set_var("PWD", dir);
+                        Ok(())
+                    }),
+                    button("s", "Shell Command", |mut ctx: Context| {
+                        ctx.leave_ui()?;
+                        std::process::Command::new("fish").spawn()?.wait()?;
+                        ctx.enter_ui()?;
+                        Ok(())
+                    }),
+                ],
+            )],
+        ),
     }
 }
+
 pub fn git() -> Page {
-    let push = page! {
-        "Git Push"
-
-        group "Arguments":
-            "-f" "Force with lease" => toggle_flag("--force-with-lease"),
-            "-F" "Force" => toggle_flag("--force"),
-            "-h" "Disable hooks" => toggle_flag("--no-verify"),
-            "-n" "Dry run" => toggle_flag("--dry-run"),
-
-        group "Push to":
-            "p" "origin/master" => |mut ctx: Context| ctx.run_command_line(),
-            "u" "upstream" => |mut ctx: Context| ctx.run_command_line(),
-            "e" "elsewhere" => |mut ctx: Context| {
-                let branch = select_branch("--remote")?;
-                let (remote, branch) = branch.split_once('/').context("branch should be remote branch")?;
-                let arg = Arg::new(
-                    ArgOrder::POSITIONAL,
-                    ArgValue::Multi(vec![
-                        ArgValue::Simple(remote.to_string()),
-                        ArgValue::Simple(format!("HEAD:{branch}"))
-                    ])
-                );
-                ctx.command_line_mut().add_arg(arg);
-                ctx.run_command_line()?;
-                Ok(())
-            },
-    };
+    let push = page(
+        "Git Push",
+        [
+            group(
+                "Arguments",
+                [
+                    flag_button("-f", "Force with lease", "--force-with-lease"),
+                    flag_button("-F", "Force", "--force"),
+                    flag_button("-h", "Disable hooks", "--no-verify"),
+                    flag_button("-n", "Dry run", "--dry-run"),
+                ],
+            ),
+            group(
+                "Push to",
+                [
+                    button("p", "origin/master", |mut ctx: Context| {
+                        ctx.run_command_line()
+                    }),
+                    button("u", "upstream", |mut ctx: Context| ctx.run_command_line()),
+                    button("e", "elsewhere", |mut ctx: Context| {
+                        let branch = select_branch("--remote")?;
+                        let (remote, branch) = branch
+                            .split_once('/')
+                            .context("branch should be remote branch")?;
+                        let arg = Arg::new(
+                            ArgOrder::POSITIONAL,
+                            ArgValue::Multi(vec![
+                                ArgValue::Simple(remote.to_string()),
+                                ArgValue::Simple(format!("HEAD:{branch}")),
+                            ]),
+                        );
+                        ctx.command_line_mut().add_arg(arg);
+                        ctx.run_command_line()?;
+                        Ok(())
+                    }),
+                ],
+            ),
+        ],
+    );
 
     let run_with_args = |args: Vec<Arg>| {
         move |mut ctx: Context| {
@@ -195,41 +221,68 @@ pub fn git() -> Page {
             Ok(())
         }
     };
-    let commit = page! {
-        "Git Commit"
+    let commit = page(
+        "Git commit",
+        [
+            group(
+                "Arguments",
+                [
+                    flag_button("-a", "Stage all modified and deleted files", "--all"),
+                    flag_button("-e", "Allow empty commit", "--allow-empty"),
+                    flag_button("-v", "Show diff of changes to be committed", "--verbose"),
+                    flag_button("-n", "Disable hooks", "--no-verify"),
+                    flag_button(
+                        "-R",
+                        "Claim authorship and reset author date",
+                        "--reset-author",
+                    ),
+                    // flag_button("-A", "Override the author", "--author"),
+                    flag_button("-s", "Add Signed-off-by line", "--signoff"),
+                    // flag_button("-C", "Reuse commit message", "--reuse-message"),
+                ],
+            ),
+            group(
+                "Actions",
+                [
+                    button("c", "Commit", run_with_args(vec![])),
+                    button(
+                        "e",
+                        "Extend",
+                        run_with_args(vec![Arg::switch("--no-edit"), Arg::switch("--amend")]),
+                    ),
+                    button(
+                        "w",
+                        "Reword",
+                        run_with_args(vec![
+                            Arg::switch("--amend"),
+                            Arg::switch("--only"),
+                            Arg::switch("--allow-empty"),
+                        ]),
+                    ),
+                    button("a", "Amend", run_with_args(vec![Arg::switch("--amend")])),
+                    button("f", "Fixup", run_with_args(vec![])),
+                    button("F", "Instant Fixup", run_with_args(vec![])),
+                ],
+            ),
+        ],
+    );
 
-        group "Arguments":
-            "-a" "Stage all modified and deleted files" => toggle_flag("--all"),
-            "-e" "Allow empty commit" => toggle_flag("--allow-empty"),
-            "-v" "Show diff of changes to be committed" => toggle_flag("--verbose"),
-            "-n" "Disable hooks" => toggle_flag("--no-verify"),
-            "-R" "Claim authorship and reset author date" => toggle_flag("--reset-author"),
-            // "-A" "Override the author" => toggle_flag("--author"),
-            "-s" "Add Signed-off-by line" => toggle_flag("--signoff"),
-            // "-C" "Reuse commit message" => toggle_flag("--reuse-message"),
-
-        group "Actions":
-            "c" "Commit" => run_with_args(vec![]),
-            "e" "Extend" => run_with_args(vec![Arg::switch("--no-edit"), Arg::switch("--amend")]),
-            "w" "Reword" => run_with_args(vec![Arg::switch("--amend"), Arg::switch("--only"), Arg::switch("--allow-empty")]),
-            "a" "Amend" => run_with_args(vec![Arg::switch("--amend")]),
-            "f" "Fixup" => run_with_args(vec![]),
-            "F" "Instant Fixup" => run_with_args(vec![]),
-    };
-
-    page! {
-        "Git"
-
-        group "Git Commands":
-            "c" "Commit" => move |mut ctx: Context| {
-                ctx.push_page(commit.clone());
-                ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
-                Ok(())
-            },
-            "p" "Push" => move |mut ctx: Context| {
-                ctx.push_page(push.clone());
-                ctx.command_line_mut().add_arg(Arg::subcommand("push"));
-                Ok(())
-            },
-    }
+    page(
+        "Git",
+        [group(
+            "Git Commands",
+            [
+                button("c", "Commit", move |mut ctx: Context| {
+                    ctx.push_page(commit.clone());
+                    ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
+                    Ok(())
+                }),
+                button("p", "Push", move |mut ctx: Context| {
+                    ctx.push_page(push.clone());
+                    ctx.command_line_mut().add_arg(Arg::subcommand("push"));
+                    Ok(())
+                }),
+            ],
+        )],
+    )
 }
