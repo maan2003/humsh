@@ -1,6 +1,9 @@
+use std::ffi::OsStr;
 use std::io::{StdoutLock, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::Context as _;
 use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
@@ -131,21 +134,25 @@ impl Ui {
         )?;
         self.draw_page(self.currrent_page(), stdout)?;
         queue!(stdout, cursor::MoveTo(0, height - 2))?;
-        stdout.flush()?;
 
         self.draw_prompt(stdout)?;
+        stdout.flush()?;
         Ok(())
     }
 
     fn draw_prompt(&self, stdout: Stdout) -> Result<(), anyhow::Error> {
-        std::process::Command::new("starship")
-            .arg("prompt")
-            .spawn()?
-            .wait()?;
+        let dir = std::env::var("PWD")
+            .map_or_else(|_| std::env::current_dir(), |x| Ok(PathBuf::from(x)))
+            .context("getting cwd")?;
+
+        let dir_name = dir.file_name().and_then(OsStr::to_str).unwrap_or("/");
 
         let cmd = self.command_line().to_string();
-        execute!(
+        queue!(
             stdout,
+            NextLine,
+            PrintStyledContent(dir_name.with(Color::Cyan)),
+            PrintStyledContent(" λ ".with(Color::Yellow)),
             Print(&cmd),
             Print(if cmd.is_empty() { "" } else { " " }),
             Print(self.key_handler.prefix()),
