@@ -101,7 +101,7 @@ fn select_branch(extra_args: &str) -> anyhow::Result<String> {
 fn select_zoxide() -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
-        .arg(format!("zoxide query -l | fzf"))
+        .arg("zoxide query -l | fzf")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
@@ -172,7 +172,7 @@ pub fn git() -> Page {
             "u" "upstream" => |mut ctx: Context| ctx.run_command_line(),
             "e" "elsewhere" => |mut ctx: Context| {
                 let branch = select_branch("--remote")?;
-                let (remote, branch) = branch.split_once("/").context("branch should be remote branch")?;
+                let (remote, branch) = branch.split_once('/').context("branch should be remote branch")?;
                 let arg = Arg::new(
                     ArgOrder::POSITIONAL,
                     ArgValue::Multi(vec![

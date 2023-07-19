@@ -114,7 +114,7 @@ impl Ui {
                     page.groups
                         .iter()
                         .flat_map(|x| &x.buttons)
-                        .map(|b| (b.key.clone(), b.callback.clone())),
+                        .map(|b| (b.key, b.callback.clone())),
                 )
             }
             _ => Ok(None),
@@ -178,7 +178,7 @@ impl Ui {
         queue!(
             stdout,
             Print(" "),
-            PrintStyledContent((&*button.key.0).with(Color::Grey)),
+            PrintStyledContent(button.key.0.with(Color::Grey)),
             Print(" "),
             Print(&button.description),
         )?;

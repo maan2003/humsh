@@ -105,7 +105,7 @@ impl Arg {
     pub fn new(order: ArgOrder, value: ArgValue) -> Self {
         Self {
             order,
-            value: value.into(),
+            value,
         }
     }
 
