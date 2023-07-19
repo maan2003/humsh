@@ -96,7 +96,7 @@ pub struct ToggleFlag(pub Arg);
 
 impl Callback for ToggleFlag {
     fn call(&self, mut ctx: Context<'_, '_>) -> anyhow::Result<()> {
-        ctx.command_line_mut().add_arg(self.0.clone());
+        ctx.command_line_mut().toggle_arg(self.0.clone());
         Ok(())
     }
 
