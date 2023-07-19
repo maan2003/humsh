@@ -1,3 +1,4 @@
+use std::io::{StdoutLock, Write};
 use std::ops::ControlFlow;
 
 use crossterm::event::{self, Event};
@@ -11,6 +12,8 @@ use crate::{
 use input::KeyHandler;
 
 mod input;
+
+type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 
 pub struct Ui {
     stack: Vec<(CommandLine, Page)>,
@@ -59,7 +62,7 @@ impl Ui {
     pub fn handle_action(
         &mut self,
         action: Action,
-        stdout: &mut impl std::io::Write,
+        stdout: Stdout,
     ) -> anyhow::Result<ControlFlow<()>> {
         match action {
             Action::Batch(actions) => {
@@ -124,13 +127,13 @@ impl Ui {
         Ok(ControlFlow::Continue(()))
     }
 
-    fn enter_ui(&self, stdout: &mut impl std::io::Write) -> crossterm::Result<()> {
+    fn enter_ui(&self, stdout: Stdout) -> crossterm::Result<()> {
         terminal::enable_raw_mode()?;
         execute!(stdout, terminal::EnterAlternateScreen)?;
         Ok(())
     }
 
-    fn leave_ui(&self, stdout: &mut impl std::io::Write) -> crossterm::Result<()> {
+    fn leave_ui(&self, stdout: Stdout) -> crossterm::Result<()> {
         // always write at end of terminal
         let (_, height) = terminal::size()?;
         execute!(
@@ -158,7 +161,7 @@ impl Ui {
         }
     }
 
-    pub fn draw(&self, mut stdout: impl std::io::Write) -> anyhow::Result<()> {
+    pub fn draw(&self, stdout: Stdout) -> anyhow::Result<()> {
         let (_, height) = terminal::size()?;
         // hack: to make terminal keep scrolling
         queue!(
@@ -166,15 +169,15 @@ impl Ui {
             cursor::MoveTo(0, height - 1),
             terminal::Clear(terminal::ClearType::All)
         )?;
-        self.draw_page(self.currrent_page(), &mut stdout)?;
+        self.draw_page(self.currrent_page(), stdout)?;
         queue!(stdout, cursor::MoveTo(0, height - 2))?;
         stdout.flush()?;
 
-        self.draw_prompt(&mut stdout)?;
+        self.draw_prompt(stdout)?;
         Ok(())
     }
 
-    fn draw_prompt(&self, stdout: &mut impl std::io::Write) -> Result<(), anyhow::Error> {
+    fn draw_prompt(&self, stdout: Stdout) -> Result<(), anyhow::Error> {
         std::process::Command::new("starship")
             .arg("prompt")
             .spawn()?
@@ -190,11 +193,7 @@ impl Ui {
         Ok(())
     }
 
-    fn draw_page(
-        &self,
-        page: &Page,
-        stdout: &mut impl std::io::Write,
-    ) -> Result<(), std::io::Error> {
+    fn draw_page(&self, page: &Page, stdout: Stdout) -> Result<(), std::io::Error> {
         for group in &page.groups {
             self.draw_group(group, stdout)?;
             queue!(stdout, NextLine)?;
@@ -202,7 +201,7 @@ impl Ui {
         Ok(())
     }
 
-    fn draw_group(&self, group: &Group, stdout: &mut impl std::io::Write) -> crossterm::Result<()> {
+    fn draw_group(&self, group: &Group, stdout: Stdout) -> crossterm::Result<()> {
         queue!(
             stdout,
             PrintStyledContent((&*group.description).with(Color::Blue)),
@@ -215,11 +214,7 @@ impl Ui {
         Ok(())
     }
 
-    fn draw_button(
-        &self,
-        button: &Button,
-        stdout: &mut impl std::io::Write,
-    ) -> crossterm::Result<()> {
+    fn draw_button(&self, button: &Button, stdout: Stdout) -> crossterm::Result<()> {
         queue!(
             stdout,
             Print(" "),
