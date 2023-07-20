@@ -1,8 +1,9 @@
 use std::{path::Path, process};
 
+use anyhow::Context as _;
 use crossterm::{execute, terminal};
 
-use crate::{command_line::CommandLine, data::Page};
+use crate::{command_line::CommandLine, data::Page, direnv::Direnv};
 
 use super::{Stdout, Ui};
 
@@ -59,6 +60,7 @@ impl<'a, 'b> Context<'a, 'b> {
     pub fn change_dir(&mut self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         std::env::set_current_dir(&path)?;
         std::env::set_var("PWD", path.as_ref());
+        self.ui.direnv = Direnv::new(std::env::current_dir()?)?;
         Ok(())
     }
 
@@ -70,6 +72,7 @@ impl<'a, 'b> Context<'a, 'b> {
         &mut self,
         command: &mut process::Command,
     ) -> anyhow::Result<process::Child> {
+        self.ui.direnv.hook(command).context("hooking direnv")?;
         Ok(command.spawn()?)
     }
 }

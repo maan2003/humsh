@@ -3,10 +3,11 @@ use anyhow::Result;
 
 mod command_line;
 mod data;
+mod direnv;
 mod ui;
 
 fn main() -> Result<()> {
     let program = data::top();
-    ui::Ui::new(program).run()?;
+    ui::Ui::new(program)?.run()?;
     Ok(())
 }

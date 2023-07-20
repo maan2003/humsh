@@ -8,6 +8,7 @@ use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
 use crate::data::{Callback, ToggleFlag};
+use crate::direnv::Direnv;
 use crate::{
     command_line::CommandLine,
     data::{self, Button, Group, Page},
@@ -23,16 +24,18 @@ pub type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 pub struct Ui {
     stack: Vec<(CommandLine, Page)>,
     key_handler: KeyHandler,
+    direnv: Direnv,
     showing_cmd: bool,
 }
 
 impl Ui {
-    pub fn new(program: data::Program) -> Self {
-        Self {
+    pub fn new(program: data::Program) -> anyhow::Result<Self> {
+        Ok(Self {
             stack: vec![(program.base, program.start)],
             key_handler: KeyHandler::new(),
+            direnv: Direnv::new(std::env::current_dir()?)?,
             showing_cmd: false,
-        }
+        })
     }
 
     pub fn command_line(&self) -> &CommandLine {
@@ -85,7 +88,9 @@ impl Ui {
             stdout,
             PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
         )?;
-        self.command_line().to_std().spawn()?.wait()?;
+        let mut cmd = self.command_line().to_std();
+        self.direnv.hook(&mut cmd).context("hooking direnv")?;
+        cmd.spawn()?.wait()?;
         self.enter_ui(stdout)?;
         Ok(())
     }
@@ -141,9 +146,7 @@ impl Ui {
     }
 
     fn draw_prompt(&self, stdout: Stdout) -> Result<(), anyhow::Error> {
-        let dir = std::env::var("PWD")
-            .map_or_else(|_| std::env::current_dir(), |x| Ok(PathBuf::from(x)))
-            .context("getting cwd")?;
+        let dir = pwd()?;
 
         let dir_name = dir.file_name().and_then(OsStr::to_str).unwrap_or("/");
 
@@ -204,6 +207,12 @@ impl Ui {
         }
         Ok(())
     }
+}
+
+fn pwd() -> Result<PathBuf, anyhow::Error> {
+    Ok(std::env::var("PWD")
+        .map_or_else(|_| std::env::current_dir(), |x| Ok(PathBuf::from(x)))
+        .context("getting cwd")?)
 }
 
 struct NextLine;
