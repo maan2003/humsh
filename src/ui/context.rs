@@ -42,6 +42,18 @@ impl<'a, 'b> Context<'a, 'b> {
         }
     }
 
+    pub fn showing_cmd(&self) -> bool {
+        self.ui.showing_cmd
+    }
+
+    pub fn show_cmd(&mut self) -> anyhow::Result<()> {
+        Ok(self.ui.show_cmd(self.stdout)?)
+    }
+
+    pub fn hide_cmd(&mut self) -> anyhow::Result<()> {
+        Ok(self.ui.hide_cmd(self.stdout)?)
+    }
+
     pub fn toggle_cmd(&mut self) -> anyhow::Result<()> {
         Ok(self.ui.toggle_cmd(self.stdout)?)
     }
@@ -51,7 +63,7 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     pub fn change_dir(&mut self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        std::env::set_current_dir(&path)?;
+        std::env::set_current_dir(&path).context("cd failed")?;
         std::env::set_var("PWD", path.as_ref());
         self.ui.direnv = Direnv::new(std::env::current_dir()?)?;
         Ok(())

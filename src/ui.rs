@@ -66,10 +66,10 @@ impl Ui {
                 };
                 // FIXME proper error handling
                 if let Err(e) = callback.call(ctx) {
-                    self.toggle_cmd(&mut stdout)?;
+                    self.hide_cmd(&mut stdout)?;
                     execute!(
                         stdout,
-                        PrintStyledContent(e.to_string().with(Color::Red)),
+                        PrintStyledContent(format!("{:#}", e).with(Color::Red)),
                         NextLine,
                     )?;
                 }
@@ -123,13 +123,24 @@ impl Ui {
         Ok(())
     }
 
+    fn hide_cmd(&mut self, stdout: Stdout) -> crossterm::Result<()> {
+        execute!(stdout, terminal::EnterAlternateScreen)?;
+        self.showing_cmd = false;
+        Ok(())
+    }
+
+    fn show_cmd(&mut self, stdout: Stdout) -> crossterm::Result<()> {
+        execute!(stdout, terminal::LeaveAlternateScreen)?;
+        self.showing_cmd = true;
+        Ok(())
+    }
+
     fn toggle_cmd(&mut self, stdout: Stdout) -> crossterm::Result<()> {
         if self.showing_cmd {
-            execute!(stdout, terminal::EnterAlternateScreen)?;
+            self.hide_cmd(stdout)?;
         } else {
-            execute!(stdout, terminal::LeaveAlternateScreen)?;
+            self.show_cmd(stdout)?;
         }
-        self.showing_cmd = !self.showing_cmd;
         Ok(())
     }
 

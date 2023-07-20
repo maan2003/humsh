@@ -81,10 +81,10 @@ fn select_branch(extra_args: &str) -> anyhow::Result<String> {
     Ok(output_text)
 }
 
-fn select_zoxide() -> anyhow::Result<String> {
+fn select_directory() -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
-        .arg("zoxide query -l | fzf")
+        .arg("cat <(zoxide query -l) <(fd --follow --maxdepth 3 -t d) | fzf")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
@@ -160,7 +160,7 @@ pub fn top() -> Program {
                         Ok(())
                     }),
                     button("c", "Change Directory", |mut ctx: Context| {
-                        ctx.change_dir(select_zoxide()?)
+                        ctx.change_dir(select_directory()?)
                     }),
                     button("s", "Shell Command", |mut ctx: Context| {
                         ctx.leave_ui()?;
@@ -290,7 +290,7 @@ pub fn git() -> Page {
                     ctx.leave_ui()?;
                     ctx.run_command(Command::new("git").arg("diff"))?.wait()?;
                     ctx.enter_ui()?;
-                    ctx.toggle_cmd()?;
+                    ctx.show_cmd()?;
                     Ok(())
                 }),
             ],

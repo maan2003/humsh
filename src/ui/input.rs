@@ -38,6 +38,10 @@ impl KeyHandler {
             KeyCode::Esc | KeyCode::F(9) => {
                 self.reset();
                 return Ok(Some(Arc::new(|mut ctx: Context| {
+                    if ctx.showing_cmd() {
+                        ctx.hide_cmd()?;
+                        return Ok(());
+                    }
                     if !ctx.pop_page() {
                         ctx.exit();
                     }
