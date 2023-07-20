@@ -3,7 +3,7 @@ use std::io::{StdoutLock, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Context as _;
+use anyhow::{bail, Context as _};
 use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
@@ -65,7 +65,14 @@ impl Ui {
                     exit: &mut exit,
                 };
                 // FIXME proper error handling
-                callback.call(ctx)?;
+                if let Err(e) = callback.call(ctx) {
+                    self.toggle_cmd(&mut stdout)?;
+                    execute!(
+                        stdout,
+                        PrintStyledContent(e.to_string().with(Color::Red)),
+                        NextLine,
+                    )?;
+                }
                 if exit {
                     break;
                 }
@@ -90,8 +97,11 @@ impl Ui {
         )?;
         let mut cmd = self.command_line().to_std();
         self.direnv.hook(&mut cmd).context("hooking direnv")?;
-        cmd.spawn()?.wait()?;
+        let status = cmd.spawn()?.wait()?;
         self.enter_ui(stdout)?;
+        if !status.success() {
+            bail!("Command failed with code {}.", status.code().unwrap_or(-1));
+        }
         Ok(())
     }
 
@@ -110,6 +120,16 @@ impl Ui {
             cursor::MoveTo(0, height - 1),
         )?;
         terminal::disable_raw_mode()?;
+        Ok(())
+    }
+
+    fn toggle_cmd(&mut self, stdout: Stdout) -> crossterm::Result<()> {
+        if self.showing_cmd {
+            execute!(stdout, terminal::EnterAlternateScreen)?;
+        } else {
+            execute!(stdout, terminal::LeaveAlternateScreen)?;
+        }
+        self.showing_cmd = !self.showing_cmd;
         Ok(())
     }
 

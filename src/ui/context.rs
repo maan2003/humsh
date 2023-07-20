@@ -1,7 +1,6 @@
 use std::{path::Path, process};
 
 use anyhow::Context as _;
-use crossterm::{execute, terminal};
 
 use crate::{command_line::CommandLine, data::Page, direnv::Direnv};
 
@@ -44,13 +43,7 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     pub fn toggle_cmd(&mut self) -> anyhow::Result<()> {
-        if self.ui.showing_cmd {
-            execute!(self.stdout, terminal::EnterAlternateScreen)?;
-        } else {
-            execute!(self.stdout, terminal::LeaveAlternateScreen)?;
-        }
-        self.ui.showing_cmd = !self.ui.showing_cmd;
-        Ok(())
+        Ok(self.ui.toggle_cmd(self.stdout)?)
     }
 
     pub fn exit(&mut self) {
