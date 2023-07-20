@@ -286,6 +286,13 @@ pub fn git() -> Page {
                     ctx.command_line_mut().add_arg(Arg::subcommand("push"));
                     Ok(())
                 }),
+                button("d", "Diff", |mut ctx: Context| {
+                    ctx.leave_ui()?;
+                    ctx.run_command(Command::new("git").arg("diff"))?.wait()?;
+                    ctx.enter_ui()?;
+                    ctx.toggle_cmd()?;
+                    Ok(())
+                }),
             ],
         )],
     )
