@@ -156,7 +156,6 @@ pub fn top() -> Program {
                     button("e", "Edit", |mut ctx: Context| {
                         ctx.leave_ui()?;
                         ctx.run_command(Command::new("hx").arg("."))?.wait()?;
-                        ctx.enter_ui()?;
                         Ok(())
                     }),
                     button("c", "Change Directory", |mut ctx: Context| {
@@ -165,8 +164,7 @@ pub fn top() -> Program {
                     button("s", "Shell Command", |mut ctx: Context| {
                         ctx.leave_ui()?;
                         let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
-                        std::process::Command::new(shell).spawn()?.wait()?;
-                        ctx.enter_ui()?;
+                        ctx.run_command(&mut Command::new(shell))?.wait()?;
                         Ok(())
                     }),
                 ],
@@ -289,7 +287,6 @@ pub fn git() -> Page {
                 button("d", "Diff", |mut ctx: Context| {
                     ctx.leave_ui()?;
                     ctx.run_command(Command::new("git").arg("diff"))?.wait()?;
-                    ctx.enter_ui()?;
                     ctx.show_cmd()?;
                     Ok(())
                 }),

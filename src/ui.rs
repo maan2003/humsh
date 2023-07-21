@@ -52,8 +52,8 @@ impl Ui {
 
     pub fn run(mut self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
-        self.enter_ui(&mut stdout)?;
         loop {
+            terminal::enable_raw_mode()?;
             if !self.showing_cmd {
                 self.draw(&mut stdout)?;
             }
@@ -66,7 +66,8 @@ impl Ui {
                 };
                 // FIXME proper error handling
                 if let Err(e) = callback.call(ctx) {
-                    self.hide_cmd(&mut stdout)?;
+                    self.leave_ui(&mut stdout)?;
+                    self.showing_cmd = true;
                     execute!(
                         stdout,
                         PrintStyledContent(format!("{:#}", e).with(Color::Red)),
@@ -96,11 +97,10 @@ impl Ui {
             PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
         )?;
         let mut cmd = self.command_line().to_std();
-        self.direnv.hook(&mut cmd).context("hooking direnv")?;
+        self.direnv.hook(&mut cmd)?;
         let status = cmd.spawn()?.wait()?;
-        self.enter_ui(stdout)?;
         if !status.success() {
-            bail!("Command failed with code {}.", status.code().unwrap_or(-1));
+            bail!("command failed with code {}.", status.code().unwrap_or(-1));
         }
         Ok(())
     }
@@ -161,6 +161,7 @@ impl Ui {
     }
 
     pub fn draw(&self, stdout: Stdout) -> anyhow::Result<()> {
+        self.enter_ui(stdout)?;
         let (_, height) = terminal::size()?;
         // hack: to make terminal keep scrolling
         queue!(

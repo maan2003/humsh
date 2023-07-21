@@ -11,6 +11,7 @@ pub struct Direnv {
 enum ChildOrEnv {
     Child(Child),
     Env(Vec<(String, String)>),
+    Error(String),
 }
 
 impl Direnv {
@@ -37,19 +38,26 @@ impl Direnv {
         if let ChildOrEnv::Child(c) = mem::replace(&mut self.child_or_env, ChildOrEnv::Env(vec![]))
         {
             let output = c.wait_with_output()?;
-            if !output.status.success() {
-                bail!("direnv failed");
-            }
-            let buf = String::from_utf8(output.stdout)?;
-            let env = buf
-                .split_terminator('\0')
-                .flat_map(|x| x.split_once('='))
-                .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .collect();
-            self.child_or_env = ChildOrEnv::Env(env);
+            self.child_or_env = if output.status.success() {
+                let buf = String::from_utf8(output.stdout)?;
+                let env = buf
+                    .split_terminator('\0')
+                    .flat_map(|x| x.split_once('='))
+                    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                    .collect();
+                ChildOrEnv::Env(env)
+            } else {
+                ChildOrEnv::Error(
+                    String::from_utf8(output.stderr)
+                        .unwrap_or_else(|_| String::from("<invalid utf8>")),
+                )
+            };
         };
-        let ChildOrEnv::Env(e) = &self.child_or_env else { unreachable!("child case handled above"); };
-        Ok(e)
+        match &self.child_or_env {
+            ChildOrEnv::Child(_) => unreachable!(),
+            ChildOrEnv::Env(e) => Ok(e),
+            ChildOrEnv::Error(e) => bail!("{e}"),
+        }
     }
 
     pub fn hook(&mut self, cmd: &mut process::Command) -> anyhow::Result<()> {

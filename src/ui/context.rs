@@ -77,7 +77,7 @@ impl<'a, 'b> Context<'a, 'b> {
         &mut self,
         command: &mut process::Command,
     ) -> anyhow::Result<process::Child> {
-        self.ui.direnv.hook(command).context("hooking direnv")?;
+        self.ui.direnv.hook(command)?;
         Ok(command.spawn()?)
     }
 }
