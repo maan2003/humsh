@@ -3,11 +3,13 @@ use std::{mem, path::PathBuf};
 
 use anyhow::{bail, Context};
 
+#[derive(Debug)]
 pub struct Direnv {
     dir: PathBuf,
     child_or_env: ChildOrEnv,
 }
 
+#[derive(Debug)]
 enum ChildOrEnv {
     Child(Child),
     Env(Vec<(String, String)>),
@@ -35,10 +37,10 @@ impl Direnv {
     }
 
     fn env(&mut self) -> anyhow::Result<&[(String, String)]> {
-        if let ChildOrEnv::Child(c) = mem::replace(&mut self.child_or_env, ChildOrEnv::Env(vec![]))
-        {
+        let mut child_or_env = mem::replace(&mut self.child_or_env, ChildOrEnv::Env(vec![]));
+        if let ChildOrEnv::Child(c) = child_or_env {
             let output = c.wait_with_output()?;
-            self.child_or_env = if output.status.success() {
+            child_or_env = if output.status.success() {
                 let buf = String::from_utf8(output.stdout)?;
                 let env = buf
                     .split_terminator('\0')
@@ -53,6 +55,7 @@ impl Direnv {
                 )
             };
         };
+        self.child_or_env = child_or_env;
         match &self.child_or_env {
             ChildOrEnv::Child(_) => unreachable!(),
             ChildOrEnv::Env(e) => Ok(e),

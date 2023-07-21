@@ -70,7 +70,7 @@ impl Ui {
                     self.showing_cmd = true;
                     execute!(
                         stdout,
-                        PrintStyledContent(format!("{:#}", e).with(Color::Red)),
+                        PrintStyledContent(format!("! {:#}", e).with(Color::Red)),
                         NextLine,
                     )?;
                 }
@@ -100,7 +100,7 @@ impl Ui {
         self.direnv.hook(&mut cmd)?;
         let status = cmd.spawn()?.wait()?;
         if !status.success() {
-            bail!("command failed with code {}.", status.code().unwrap_or(-1));
+            bail!("exit code {}", status.code().unwrap_or(-1));
         }
         Ok(())
     }
