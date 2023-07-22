@@ -22,7 +22,7 @@ impl Config {
     pub fn into_page(self, desc: impl Into<String>) -> data::Page {
         let desc = desc.into();
         data::Page {
-            description: String::from(desc.clone()),
+            status: None,
             groups: vec![data::Group {
                 description: String::from(desc),
                 buttons: self
