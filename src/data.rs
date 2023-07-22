@@ -67,6 +67,11 @@ impl Page {
             groups: Vec::new(),
         }
     }
+
+    pub fn with_status(mut self, status: impl Into<String>) -> Self {
+        self.status = Some(status.into());
+        self
+    }
 }
 
 fn select_branch(extra_args: &str) -> anyhow::Result<String> {
@@ -149,7 +154,7 @@ pub fn top() -> Program {
             [
                 button("b", "Build", toggle_flag("todo build")),
                 button("g", "Git", |mut ctx: Context| {
-                    ctx.push_page(git());
+                    ctx.push_page(git()?);
                     ctx.command_line_mut().add_arg(Arg::program("git"));
                     Ok(())
                 }),
@@ -181,7 +186,20 @@ pub fn top() -> Program {
     }
 }
 
-pub fn git() -> Page {
+fn git_status() -> anyhow::Result<String> {
+    let output = Command::new("git")
+        .arg("-c")
+        .arg("color.status=always")
+        .arg("-c")
+        .arg("advice.statusHints=false")
+        .arg("status")
+        .arg("--branch")
+        .arg("--show-stash")
+        .output()?;
+    Ok(String::from_utf8(output.stdout)?)
+}
+
+pub fn git() -> anyhow::Result<Page> {
     let push = page([
         group(
             "Arguments",
@@ -272,7 +290,7 @@ pub fn git() -> Page {
         ),
     ]);
 
-    page([group(
+    let page = page([group(
         "Git Commands",
         [
             button("c", "Commit", move |mut ctx: Context| {
@@ -293,4 +311,7 @@ pub fn git() -> Page {
             }),
         ],
     )])
+    .with_status(git_status()?);
+
+    Ok(page)
 }

@@ -196,6 +196,11 @@ impl Ui {
     }
 
     fn draw_page(&self, page: &Page, stdout: Stdout) -> Result<(), std::io::Error> {
+        if let Some(status) = &page.status {
+            terminal::disable_raw_mode()?;
+            execute!(stdout, Print(status), NextLine)?;
+            terminal::enable_raw_mode()?;
+        }
         for group in &page.groups {
             self.draw_group(group, stdout)?;
             queue!(stdout, NextLine)?;
