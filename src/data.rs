@@ -309,6 +309,18 @@ pub fn git() -> anyhow::Result<Page> {
                 ctx.show_cmd()?;
                 Ok(())
             }),
+            button("l", "Log", |mut ctx: Context| {
+                ctx.leave_ui()?;
+                ctx.run_command(
+                    Command::new("git")
+                        .arg("log")
+                        .arg("--format=oneline")
+                        .arg("--abbrev-commit"),
+                )?
+                .wait()?;
+                ctx.show_cmd()?;
+                Ok(())
+            }),
         ],
     )])
     .with_status(git_status()?);
