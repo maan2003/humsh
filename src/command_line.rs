@@ -103,10 +103,7 @@ impl FromIterator<Arg> for CommandLine {
 
 impl Arg {
     pub fn new(order: ArgOrder, value: ArgValue) -> Self {
-        Self {
-            order,
-            value,
-        }
+        Self { order, value }
     }
 
     pub fn switch(value: impl Into<String>) -> Self {
