@@ -2,6 +2,7 @@
 use anyhow::Result;
 
 mod command_line;
+mod config;
 mod data;
 mod direnv;
 mod ui;

@@ -1,9 +1,12 @@
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::{process::Stdio, sync::Arc};
 
 use anyhow::Context as _;
 
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
+use crate::config::Config;
 use crate::ui::Context;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -165,6 +168,12 @@ pub fn top() -> Program {
                         ctx.leave_ui()?;
                         let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
                         ctx.run_command(&mut Command::new(shell))?.wait()?;
+                        Ok(())
+                    }),
+                    button("l", "Local", |mut ctx: Context| {
+                        // TODO: add button to create a new command
+                        let path = ".humsh/commands.toml";
+                        ctx.push_page(Config::read(path).unwrap_or_default().into_page());
                         Ok(())
                     }),
                 ],
