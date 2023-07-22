@@ -24,10 +24,10 @@ impl KeyHandler {
         self.current_keys.clear();
     }
 
-    pub fn handle_key(
+    pub fn handle_key<'a>(
         &mut self,
         key: KeyEvent,
-        bindings: impl Iterator<Item = (Keybind, Arc<dyn Callback>)>,
+        bindings: impl Iterator<Item = (&'a Keybind, &'a Arc<dyn Callback>)>,
     ) -> crossterm::Result<Option<Arc<dyn Callback>>> {
         let key = match key.code {
             KeyCode::Char('`') => {
@@ -55,7 +55,7 @@ impl KeyHandler {
         for (key, action) in bindings {
             if key.0 == self.current_keys {
                 self.current_keys = String::new();
-                return Ok(Some(action));
+                return Ok(Some(action.clone()));
             } else if key.0.starts_with(&self.current_keys) {
                 return Ok(None);
             }

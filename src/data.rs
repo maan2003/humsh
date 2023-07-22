@@ -6,8 +6,8 @@ use anyhow::Context as _;
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 use crate::ui::Context;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Keybind(pub &'static str);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Keybind(pub String);
 
 #[derive(Debug, Clone)]
 pub struct Button {
@@ -124,7 +124,7 @@ pub fn group(description: impl Into<String>, buttons: impl Into<Vec<Button>>) ->
 }
 
 pub fn button(
-    key: &'static str,
+    key: impl Into<String>,
     description: impl Into<String>,
     callback: impl Callback + 'static,
 ) -> Button {
