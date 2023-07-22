@@ -198,7 +198,8 @@ pub fn git() -> Page {
                 button("p", "origin/master", |mut ctx: Context| {
                     ctx.run_command_line()
                 }),
-                button("u", "upstream", |mut ctx: Context| ctx.run_command_line()),
+                // TODO
+                // button("u", "upstream", |mut ctx: Context| ctx.run_command_line()),
                 button("e", "elsewhere", |mut ctx: Context| {
                     let branch = select_branch("--remote")?;
                     let (remote, branch) = branch
