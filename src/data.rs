@@ -173,7 +173,10 @@ pub fn top() -> Program {
                     button("l", "Local", |mut ctx: Context| {
                         // TODO: add button to create a new command
                         let path = ".humsh/commands.toml";
-                        ctx.push_page(Config::read(path).unwrap_or_default().into_page());
+                        if !Path::try_exists(path.as_ref())? {
+                            return Err(anyhow::format_err!("{path} does not exist"));
+                        }
+                        ctx.push_page(Config::read(path)?.into_page("Local commands"));
                         Ok(())
                     }),
                 ],

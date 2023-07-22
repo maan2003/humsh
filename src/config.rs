@@ -19,11 +19,12 @@ impl Config {
         Ok(toml::from_str(&fs::read_to_string(path)?)?)
     }
 
-    pub fn into_page(self) -> data::Page {
+    pub fn into_page(self, desc: impl Into<String>) -> data::Page {
+        let desc = desc.into();
         data::Page {
-            description: String::from("Config"),
+            description: String::from(desc.clone()),
             groups: vec![data::Group {
-                description: String::from("Commands"),
+                description: String::from(desc),
                 buttons: self
                     .commands
                     .into_iter()
