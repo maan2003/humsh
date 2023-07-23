@@ -189,8 +189,8 @@ fn home_page() -> Result<Page, anyhow::Error> {
     )]);
     let path = ".humsh/commands.toml";
     if Path::try_exists(path.as_ref())? {
-        let local_page = Config::read(path)?.into_page("Local commands");
-        Ok(builtin_page.merge(local_page))
+        let project_page = Config::read(path)?.into_page("Project commands");
+        Ok(builtin_page.merge(project_page))
     } else {
         Ok(builtin_page)
     }
