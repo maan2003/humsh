@@ -27,7 +27,7 @@ impl Config {
         data::Page {
             status: None,
             groups: vec![data::Group {
-                description: String::from(desc),
+                description: desc,
                 buttons: self
                     .commands
                     .into_iter()

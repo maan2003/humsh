@@ -54,7 +54,7 @@ impl Ui {
         &mut self.stack.last_mut().expect("stack must not be empty").1
     }
 
-    pub fn multi_term<'a>(&'a mut self) -> Option<&'a mut Box<dyn MultiTerm>> {
+    pub fn multi_term(&mut self) -> Option<&mut Box<dyn MultiTerm>> {
         self.multi_term.as_mut()
     }
 
@@ -258,9 +258,9 @@ impl Ui {
 }
 
 fn pwd() -> Result<PathBuf, anyhow::Error> {
-    Ok(std::env::var("PWD")
+    std::env::var("PWD")
         .map_or_else(|_| std::env::current_dir(), |x| Ok(PathBuf::from(x)))
-        .context("getting cwd")?)
+        .context("getting cwd")
 }
 
 struct NextLine;
