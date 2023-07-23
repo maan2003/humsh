@@ -185,11 +185,6 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 ctx.run_command(&mut Command::new(shell))?.wait()?;
                 Ok(())
             }),
-            button("x", "Explore", |mut ctx: Context| {
-                ctx.leave_ui()?;
-                ctx.run_command(&mut Command::new("nnn"))?.wait()?;
-                Ok(())
-            }),
         ],
     )]);
     let maybe_merge = |name: &str, path, page: Page| -> anyhow::Result<Page> {
