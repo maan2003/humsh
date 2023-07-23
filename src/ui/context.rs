@@ -33,6 +33,10 @@ impl<'a, 'b> Context<'a, 'b> {
         self.ui.stack.push((self.command_line().clone(), page));
     }
 
+    pub fn replace_page(&mut self, page: Page) {
+        *self.ui.currrent_page_mut() = page;
+    }
+
     /// Returns whether page was poped.
     pub fn pop_page(&mut self) -> bool {
         if self.ui.stack.len() > 1 {

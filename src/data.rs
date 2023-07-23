@@ -153,6 +153,14 @@ pub fn flag_button(key: &'static str, description: &str, flag: &str) -> Button {
 }
 
 pub fn top() -> anyhow::Result<Program> {
+    let start = home_page()?;
+    Ok(Program {
+        base: CommandLine::from_iter([]),
+        start,
+    })
+}
+
+fn home_page() -> Result<Page, anyhow::Error> {
     let builtin_page = page([group(
         "Commands",
         [
@@ -167,7 +175,9 @@ pub fn top() -> anyhow::Result<Program> {
                 Ok(())
             }),
             button("c", "Change Directory", |mut ctx: Context| {
-                ctx.change_dir(select_directory()?)
+                ctx.change_dir(select_directory()?)?;
+                ctx.replace_page(home_page()?);
+                Ok(())
             }),
             button("s", "Shell Command", |mut ctx: Context| {
                 ctx.leave_ui()?;
@@ -177,18 +187,13 @@ pub fn top() -> anyhow::Result<Program> {
             }),
         ],
     )]);
-
     let path = ".humsh/commands.toml";
-    let start = if Path::try_exists(path.as_ref())? {
+    if Path::try_exists(path.as_ref())? {
         let local_page = Config::read(path)?.into_page("Local commands");
-        builtin_page.merge(local_page)
+        Ok(builtin_page.merge(local_page))
     } else {
-        builtin_page
-    };
-    Ok(Program {
-        base: CommandLine::from_iter([]),
-        start,
-    })
+        Ok(builtin_page)
+    }
 }
 
 fn git_status() -> anyhow::Result<String> {

@@ -50,6 +50,10 @@ impl Ui {
         &self.stack.last().expect("stack must not be empty").1
     }
 
+    pub fn currrent_page_mut(&mut self) -> &mut Page {
+        &mut self.stack.last_mut().expect("stack must not be empty").1
+    }
+
     pub fn multi_term<'a>(&'a mut self) -> Option<&'a mut Box<dyn MultiTerm>> {
         self.multi_term.as_mut()
     }
