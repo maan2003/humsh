@@ -197,9 +197,7 @@ impl Ui {
 
     fn draw_page(&self, page: &Page, stdout: Stdout) -> Result<(), std::io::Error> {
         if let Some(status) = &page.status {
-            terminal::disable_raw_mode()?;
-            execute!(stdout, Print(status), NextLine)?;
-            terminal::enable_raw_mode()?;
+            execute!(stdout, Print(status.replace('\n', "\r\n")), NextLine)?;
         }
         for group in &page.groups {
             self.draw_group(group, stdout)?;
@@ -255,7 +253,7 @@ fn pwd() -> Result<PathBuf, anyhow::Error> {
 struct NextLine;
 impl crossterm::Command for NextLine {
     fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
-        Print('\n').write_ansi(f)?;
+        Print("\r\n").write_ansi(f)?;
         cursor::MoveToColumn(0).write_ansi(f)?;
         Ok(())
     }
