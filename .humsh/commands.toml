@@ -1,0 +1,10 @@
+[[commands]]
+key = "r"
+desc = "Run"
+command = "cargo run -q"
+term = true
+
+[[commands]]
+key = "k"
+desc = "Clippy"
+command = "cargo clippy"
