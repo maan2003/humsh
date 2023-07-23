@@ -171,6 +171,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
             }),
             button("e", "Edit", |mut ctx: Context| {
                 ctx.leave_ui()?;
+                // TODO: handle EDITOR
                 ctx.run_command_new_term(Command::new("hx").arg("."))?;
                 Ok(())
             }),
