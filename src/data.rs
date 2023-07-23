@@ -290,6 +290,23 @@ pub fn git() -> anyhow::Result<Page> {
         ),
     ]);
 
+    let fetch = page([group(
+        "Fetch from",
+        [
+            button(
+                "p",
+                "origin",
+                run_with_args(vec![Arg::positional("origin")]),
+            ),
+            button(
+                "u",
+                "upstream",
+                run_with_args(vec![Arg::positional("upstream")]),
+            ),
+            button("f", "all", run_with_args(vec![Arg::switch("--all")])),
+        ],
+    )]);
+
     let page = page([group(
         "Git Commands",
         [
@@ -301,6 +318,11 @@ pub fn git() -> anyhow::Result<Page> {
             button("p", "Push", move |mut ctx: Context| {
                 ctx.push_page(push.clone());
                 ctx.command_line_mut().add_arg(Arg::subcommand("push"));
+                Ok(())
+            }),
+            button("f", "Fetch", move |mut ctx: Context| {
+                ctx.push_page(fetch.clone());
+                ctx.command_line_mut().add_arg(Arg::subcommand("fetch"));
                 Ok(())
             }),
             button("d", "Diff", |mut ctx: Context| {
