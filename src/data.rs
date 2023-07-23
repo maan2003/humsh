@@ -313,6 +313,8 @@ pub fn git() -> anyhow::Result<Page> {
             button("c", "Commit", move |mut ctx: Context| {
                 ctx.push_page(commit.clone());
                 ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
+                // TODO: enable this later
+                // ctx.command_line_mut().add_arg(Arg::switch("--verbose"));
                 Ok(())
             }),
             button("p", "Push", move |mut ctx: Context| {
