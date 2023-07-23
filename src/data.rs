@@ -160,7 +160,7 @@ pub fn top() -> Program {
                 }),
                 button("e", "Edit", |mut ctx: Context| {
                     ctx.leave_ui()?;
-                    ctx.run_command(Command::new("hx").arg("."))?.wait()?;
+                    ctx.run_command_new_term(Command::new("hx").arg("."))?;
                     Ok(())
                 }),
                 button("c", "Change Directory", |mut ctx: Context| {

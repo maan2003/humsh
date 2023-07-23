@@ -5,6 +5,7 @@ mod command_line;
 mod config;
 mod data;
 mod direnv;
+mod multi_term;
 mod ui;
 
 fn main() -> Result<()> {

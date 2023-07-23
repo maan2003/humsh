@@ -73,6 +73,16 @@ impl<'a, 'b> Context<'a, 'b> {
         self.ui.run_command_line(self.stdout)
     }
 
+    pub fn run_command_new_term(&mut self, command: &mut process::Command) -> anyhow::Result<()> {
+        self.ui.direnv.hook(command)?;
+        if let Some(mux) = self.ui.multi_term() {
+            mux.run(command)
+        } else {
+            command.spawn()?.wait()?;
+            Ok(())
+        }
+    }
+
     pub fn run_command(
         &mut self,
         command: &mut process::Command,

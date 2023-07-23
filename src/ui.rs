@@ -7,12 +7,10 @@ use anyhow::{bail, Context as _};
 use crossterm::event::{self, Event};
 use crossterm::{cursor, execute, queue, style::*, terminal};
 
-use crate::data::{Callback, ToggleFlag};
+use crate::command_line::CommandLine;
+use crate::data::{self, Button, Callback, Group, Page, ToggleFlag};
 use crate::direnv::Direnv;
-use crate::{
-    command_line::CommandLine,
-    data::{self, Button, Group, Page},
-};
+use crate::multi_term::{self, MultiTerm};
 pub use context::Context;
 use input::KeyHandler;
 
@@ -26,6 +24,7 @@ pub struct Ui {
     key_handler: KeyHandler,
     direnv: Direnv,
     showing_cmd: bool,
+    multi_term: Option<Box<dyn MultiTerm + 'static>>,
 }
 
 impl Ui {
@@ -35,6 +34,7 @@ impl Ui {
             key_handler: KeyHandler::new(),
             direnv: Direnv::new(std::env::current_dir()?)?,
             showing_cmd: false,
+            multi_term: multi_term::detect(),
         })
     }
 
@@ -48,6 +48,10 @@ impl Ui {
 
     pub fn currrent_page(&self) -> &Page {
         &self.stack.last().expect("stack must not be empty").1
+    }
+
+    pub fn multi_term<'a>(&'a mut self) -> Option<&'a mut Box<dyn MultiTerm>> {
+        self.multi_term.as_mut()
     }
 
     pub fn run(mut self) -> anyhow::Result<()> {
