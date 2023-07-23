@@ -2,7 +2,7 @@ use std::path::Path;
 use std::process::Command;
 use std::{process::Stdio, sync::Arc};
 
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 use crate::config::Config;
@@ -162,7 +162,7 @@ pub fn top() -> anyhow::Result<Program> {
 
 fn home_page() -> Result<Page, anyhow::Error> {
     let builtin_page = page([group(
-        "Commands",
+        "Builtin commands",
         [
             button("g", "Git", |mut ctx: Context| {
                 ctx.push_page(git()?);
@@ -192,13 +192,25 @@ fn home_page() -> Result<Page, anyhow::Error> {
             }),
         ],
     )]);
-    let path = ".humsh/commands.toml";
-    if Path::try_exists(path.as_ref())? {
-        let project_page = Config::read(path)?.into_page("Project commands");
-        Ok(builtin_page.merge(project_page))
-    } else {
-        Ok(builtin_page)
-    }
+    let maybe_merge = |name: &str, path, page: Page| -> anyhow::Result<Page> {
+        if Path::try_exists(path)? {
+            let new_page = Config::read(path)?.into_page(name);
+            Ok(page.merge(new_page))
+        } else {
+            Ok(page)
+        }
+    };
+    maybe_merge(
+        "Project commands",
+        ".humsh/commands.toml".as_ref(),
+        maybe_merge(
+            "User commands",
+            &dirs::config_dir()
+                .ok_or_else(|| anyhow!("config dir not found"))?
+                .join("humsh/commands.toml"),
+            builtin_page,
+        )?,
+    )
 }
 
 fn git_status() -> anyhow::Result<String> {
