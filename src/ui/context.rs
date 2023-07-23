@@ -87,6 +87,11 @@ impl<'a, 'b> Context<'a, 'b> {
         }
     }
 
+    pub fn hint_running_command(&mut self, cmd: &str) -> anyhow::Result<()> {
+        self.ui.hint_running_command(cmd, self.stdout)?;
+        Ok(())
+    }
+
     pub fn run_command(
         &mut self,
         command: &mut process::Command,

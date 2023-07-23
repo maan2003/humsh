@@ -36,9 +36,11 @@ impl Config {
                             let mut command = std::process::Command::new("bash");
                             command.arg("-c").arg(&x.command);
                             if x.term {
-                                ctx.leave_ui()?;
                                 ctx.run_command_new_term(&mut command)?;
                             } else {
+                                ctx.leave_ui()?;
+                                ctx.show_cmd()?;
+                                ctx.hint_running_command(&x.command)?;
                                 ctx.run_command(&mut command)?.wait()?;
                             }
                             Ok(())

@@ -100,16 +100,21 @@ impl Ui {
             .map(|x| x.value.to_string())
             .collect::<Vec<_>>()
             .join(" ");
-        execute!(
-            stdout,
-            PrintStyledContent(format!("> {cli}\n").with(Color::DarkGreen))
-        )?;
+        self.hint_running_command(&cli, stdout)?;
         let mut cmd = self.command_line().to_std();
         self.direnv.hook(&mut cmd)?;
         let status = cmd.spawn()?.wait()?;
         if !status.success() {
             bail!("exit code {}", status.code().unwrap_or(-1));
         }
+        Ok(())
+    }
+
+    fn hint_running_command(&self, cmd: &str, stdout: Stdout) -> crossterm::Result<()> {
+        execute!(
+            stdout,
+            PrintStyledContent(format!("> {cmd}\n").with(Color::DarkGreen))
+        )?;
         Ok(())
     }
 
