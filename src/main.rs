@@ -9,7 +9,7 @@ mod multi_term;
 mod ui;
 
 fn main() -> Result<()> {
-    let program = data::top();
+    let program = data::top()?;
     ui::Ui::new(program)?.run()?;
     Ok(())
 }

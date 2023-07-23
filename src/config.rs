@@ -12,6 +12,9 @@ pub struct Command {
     key: String,
     desc: String,
     command: String,
+
+    #[serde(default)]
+    term: bool,
 }
 
 impl Config {
@@ -30,11 +33,14 @@ impl Config {
                     .into_iter()
                     .map(move |x| {
                         data::button(&x.key, x.desc, move |mut ctx: Context| {
-                            ctx.leave_ui()?;
-                            ctx.run_command(
-                                std::process::Command::new("bash").arg("-c").arg(&x.command),
-                            )?
-                            .wait()?;
+                            let mut command = std::process::Command::new("bash");
+                            command.arg("-c").arg(&x.command);
+                            if x.term {
+                                ctx.leave_ui()?;
+                                ctx.run_command_new_term(&mut command)?;
+                            } else {
+                                ctx.run_command(&mut command)?.wait()?;
+                            }
                             Ok(())
                         })
                     })

@@ -72,6 +72,12 @@ impl Page {
         self.status = Some(status.into());
         self
     }
+
+    pub fn merge(mut self, other: Page) -> Page {
+        self.groups.extend(other.groups);
+        self.status = other.status.or(self.status);
+        self
+    }
 }
 
 fn select_branch(extra_args: &str) -> anyhow::Result<String> {
@@ -146,44 +152,43 @@ pub fn flag_button(key: &'static str, description: &str, flag: &str) -> Button {
     button(key, description, ToggleFlag(Arg::switch(flag)))
 }
 
-pub fn top() -> Program {
-    Program {
+pub fn top() -> anyhow::Result<Program> {
+    let builtin_page = page([group(
+        "Commands",
+        [
+            button("g", "Git", |mut ctx: Context| {
+                ctx.push_page(git()?);
+                ctx.command_line_mut().add_arg(Arg::program("git"));
+                Ok(())
+            }),
+            button("e", "Edit", |mut ctx: Context| {
+                ctx.leave_ui()?;
+                ctx.run_command_new_term(Command::new("hx").arg("."))?;
+                Ok(())
+            }),
+            button("c", "Change Directory", |mut ctx: Context| {
+                ctx.change_dir(select_directory()?)
+            }),
+            button("s", "Shell Command", |mut ctx: Context| {
+                ctx.leave_ui()?;
+                let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
+                ctx.run_command(&mut Command::new(shell))?.wait()?;
+                Ok(())
+            }),
+        ],
+    )]);
+
+    let path = ".humsh/commands.toml";
+    let start = if Path::try_exists(path.as_ref())? {
+        let local_page = Config::read(path)?.into_page("Local commands");
+        builtin_page.merge(local_page)
+    } else {
+        builtin_page
+    };
+    Ok(Program {
         base: CommandLine::from_iter([]),
-        start: page([group(
-            "Commands",
-            [
-                button("b", "Build", toggle_flag("todo build")),
-                button("g", "Git", |mut ctx: Context| {
-                    ctx.push_page(git()?);
-                    ctx.command_line_mut().add_arg(Arg::program("git"));
-                    Ok(())
-                }),
-                button("e", "Edit", |mut ctx: Context| {
-                    ctx.leave_ui()?;
-                    ctx.run_command_new_term(Command::new("hx").arg("."))?;
-                    Ok(())
-                }),
-                button("c", "Change Directory", |mut ctx: Context| {
-                    ctx.change_dir(select_directory()?)
-                }),
-                button("s", "Shell Command", |mut ctx: Context| {
-                    ctx.leave_ui()?;
-                    let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
-                    ctx.run_command(&mut Command::new(shell))?.wait()?;
-                    Ok(())
-                }),
-                button("l", "Local", |mut ctx: Context| {
-                    // TODO: add button to create a new command
-                    let path = ".humsh/commands.toml";
-                    if !Path::try_exists(path.as_ref())? {
-                        return Err(anyhow::format_err!("{path} does not exist"));
-                    }
-                    ctx.push_page(Config::read(path)?.into_page("Local commands"));
-                    Ok(())
-                }),
-            ],
-        )]),
-    }
+        start,
+    })
 }
 
 fn git_status() -> anyhow::Result<String> {
