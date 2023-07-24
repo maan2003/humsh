@@ -196,7 +196,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
             Ok(page)
         }
     };
-    maybe_merge(
+    Ok(maybe_merge(
         "Project commands",
         ".humsh/commands.toml".as_ref(),
         maybe_merge(
@@ -206,7 +206,8 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 .join("humsh/commands.toml"),
             builtin_page,
         )?,
-    )
+    )?
+    .with_status("> Please support humsh at https://github.com/sponsors/maan2003\n"))
 }
 
 fn git_status() -> anyhow::Result<String> {
