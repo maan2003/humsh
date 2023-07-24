@@ -15,3 +15,12 @@ Everything is 2-3 key strokes away.
 #### Git commit menu
 
 <img src="https://github.com/Maan2003/humsh/assets/49202620/6a9925d6-70e0-48b3-aae6-41777b2397b8" width="650" />
+
+
+## Running
+
+0. Install Nix package manager.
+
+```shell
+nix develop -c cargo r -q
+```
