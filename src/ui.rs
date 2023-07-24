@@ -184,8 +184,10 @@ impl Ui {
         )?;
         self.draw_page(self.currrent_page(), stdout)?;
 
-        if let Some(mux) = &self.multi_term {
-            self.draw_tabs(&mux.list_windows()?, stdout)?;
+        if self.stack.len() == 1 {
+            if let Some(mux) = &self.multi_term {
+                self.draw_tabs(&mux.list_windows()?, stdout)?;
+            }
         }
 
         self.draw_prompt(stdout)?;
@@ -201,7 +203,6 @@ impl Ui {
         let cmd = self.command_line().to_string();
         queue!(
             stdout,
-            NextLine,
             PrintStyledContent(dir_name.with(Color::Cyan)),
             PrintStyledContent(" λ ".with(Color::Yellow)),
             Print(&cmd),
@@ -227,7 +228,7 @@ impl Ui {
                 Print("\t")
             )?;
         }
-        queue!(stdout, NextLine)?;
+        queue!(stdout, NextLine, NextLine)?;
         Ok(())
     }
 
