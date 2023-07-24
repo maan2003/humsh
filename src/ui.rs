@@ -24,7 +24,7 @@ pub struct Ui {
     key_handler: KeyHandler,
     direnv: Direnv,
     showing_cmd: bool,
-    multi_term: Option<Box<dyn MultiTerm + 'static>>,
+    multi_term: Option<MultiTerm>,
 }
 
 impl Ui {
@@ -54,7 +54,7 @@ impl Ui {
         &mut self.stack.last_mut().expect("stack must not be empty").1
     }
 
-    pub fn multi_term(&mut self) -> Option<&mut Box<dyn MultiTerm>> {
+    pub fn multi_term(&mut self) -> Option<&mut MultiTerm> {
         self.multi_term.as_mut()
     }
 

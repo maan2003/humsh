@@ -1,15 +1,15 @@
 use std::{env, process::Command};
 
-pub trait MultiTerm {
-    /// Command::envs and Command::args must be respected.
-    // TODO: return a handle
-    fn run(&mut self, command: &mut Command) -> anyhow::Result<()>;
+enum TermDetect {
+    Tmux,
 }
 
-struct Tmux;
+pub struct MultiTerm {
+    kind: TermDetect,
+}
 
-impl MultiTerm for Tmux {
-    fn run(&mut self, command: &mut Command) -> anyhow::Result<()> {
+impl MultiTerm {
+    pub fn run(&mut self, command: &mut Command) -> anyhow::Result<()> {
         Command::new("tmux")
             .arg("new-window")
             .envs(
@@ -25,9 +25,11 @@ impl MultiTerm for Tmux {
     }
 }
 
-pub fn detect() -> Option<Box<dyn MultiTerm>> {
+pub fn detect() -> Option<MultiTerm> {
     if env::var("TMUX").is_ok_and(|x| !x.is_empty()) {
-        return Some(Box::new(Tmux));
+        return Some(MultiTerm {
+            kind: TermDetect::Tmux,
+        });
     }
     None
 }
