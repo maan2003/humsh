@@ -10,7 +10,7 @@ use crossterm::{cursor, execute, queue, style::*, terminal};
 use crate::command_line::CommandLine;
 use crate::data::{self, Button, Callback, Group, Page, ToggleFlag};
 use crate::direnv::Direnv;
-use crate::multi_term::{self, MultiTerm};
+use crate::multi_term::{self, MultiTerm, TabHandle};
 pub use context::Context;
 use input::KeyHandler;
 
@@ -183,7 +183,10 @@ impl Ui {
             terminal::Clear(terminal::ClearType::All)
         )?;
         self.draw_page(self.currrent_page(), stdout)?;
-        queue!(stdout, cursor::MoveTo(0, height - 2))?;
+
+        if let Some(mux) = &self.multi_term {
+            self.draw_tabs(&mux.list_windows()?, stdout)?;
+        }
 
         self.draw_prompt(stdout)?;
         stdout.flush()?;
@@ -205,6 +208,26 @@ impl Ui {
             Print(if cmd.is_empty() { "" } else { " " }),
             Print(self.key_handler.prefix()),
         )?;
+        Ok(())
+    }
+
+    fn draw_tabs(&self, tabs: &[TabHandle], stdout: Stdout) -> crossterm::Result<()> {
+        queue!(
+            stdout,
+            Print("Tabs".with(Color::Blue)),
+            NextLine,
+            Print(" ")
+        )?;
+        for handle in tabs {
+            queue!(
+                stdout,
+                Print(handle.number()),
+                Print(" "),
+                Print(handle.name()),
+                Print("\t")
+            )?;
+        }
+        queue!(stdout, NextLine)?;
         Ok(())
     }
 

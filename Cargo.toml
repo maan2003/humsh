@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.72"
 crossterm = "0.26.1"
+csv = "1.2.2"
 dirs = "5.0.1"
 serde = { version = "1.0.174", features = ["derive"] }
 toml = "0.7.6"
