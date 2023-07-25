@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{bail, Context as _};
-use crossterm::event::{self, Event};
+use crossterm::event;
 use crossterm::{cursor, execute, queue, style::*, terminal};
+use tokio_stream::StreamExt;
 
 use crate::command_line::CommandLine;
 use crate::data::{self, Button, Callback, Group, Page, ToggleFlag};
@@ -19,22 +20,32 @@ mod input;
 
 pub type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 
+#[derive(Debug)]
+pub enum Event {
+    Term(crossterm::event::Event),
+}
+
 pub struct Ui {
     stack: Vec<(CommandLine, Page)>,
     key_handler: KeyHandler,
     direnv: Direnv,
     showing_cmd: bool,
     multi_term: Option<MultiTerm>,
+    event_tx: flume::Sender<Event>,
+    event_rx: flume::Receiver<Event>,
 }
 
 impl Ui {
     pub fn new(program: data::Program) -> anyhow::Result<Self> {
+        let (event_tx, event_rx) = flume::bounded(10);
         Ok(Self {
             stack: vec![(program.base, program.start)],
             key_handler: KeyHandler::new(),
             direnv: Direnv::new(std::env::current_dir()?)?,
             showing_cmd: false,
             multi_term: multi_term::detect(),
+            event_tx,
+            event_rx,
         })
     }
 
@@ -58,14 +69,29 @@ impl Ui {
         self.multi_term.as_mut()
     }
 
+    pub fn make_event_tx(&self) -> flume::Sender<Event> {
+        self.event_tx.clone()
+    }
+
     pub fn run(mut self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
+        terminal::enable_raw_mode()?;
+        let event_tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            while let Some(event) = crossterm::event::EventStream::new().next().await {
+                event_tx.send_async(Event::Term(event?)).await?;
+            }
+            anyhow::Ok(())
+        });
         loop {
             terminal::enable_raw_mode()?;
             if !self.showing_cmd {
                 self.draw(&mut stdout)?;
             }
-            if let Some(callback) = self.process_event(event::read()?)? {
+            let Ok(event) = self.event_rx.recv() else {
+                break;
+            };
+            if let Some(callback) = self.process_event(event)? {
                 let mut exit = false;
                 let ctx = Context {
                     stdout: &mut stdout,
@@ -159,7 +185,7 @@ impl Ui {
 
     pub fn process_event(&mut self, event: Event) -> crossterm::Result<Option<Arc<dyn Callback>>> {
         match event {
-            Event::Key(key) => {
+            Event::Term(crossterm::event::Event::Key(key)) => {
                 let page = &self.stack.last().expect("stack must not be empty").1;
                 self.key_handler.handle_key(
                     key,
@@ -169,7 +195,7 @@ impl Ui {
                         .map(|b| (&b.key, &b.callback)),
                 )
             }
-            _ => Ok(None),
+            Event::Term(_) => Ok(None),
         }
     }
 
