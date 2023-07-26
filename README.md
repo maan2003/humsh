@@ -6,7 +6,7 @@ Everything is 2-3 key strokes away.
 
 #### Top Level Menu
 
-<img src="https://github.com/Maan2003/humsh/assets/49202620/81c8c6d2-9f5f-472f-8ded-e8803a41960e" width="650" />
+<img src="https://github.com/Maan2003/humsh/assets/49202620/c23e56ea-5896-484c-8f8c-7ccd3c5cf980" width="650" />
 
 #### Git menu
 
