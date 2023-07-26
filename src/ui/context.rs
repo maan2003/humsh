@@ -4,12 +4,23 @@ use anyhow::Context as _;
 
 use crate::{command_line::CommandLine, data::Page, direnv::Direnv};
 
-use super::{Stdout, Ui};
+use super::{Event, Stdout, Ui};
 
 pub struct Context<'a, 'b> {
     pub(super) stdout: Stdout<'a, 'b>,
     pub(super) ui: &'a mut Ui,
     pub(super) exit: &'a mut bool,
+}
+
+#[derive(Debug)]
+pub struct ExternalContext {
+    tx: flume::Sender<Event>,
+}
+
+impl ExternalContext {
+    pub(super) fn new(tx: flume::Sender<Event>) -> Self {
+        Self { tx }
+    }
 }
 
 impl<'a, 'b> Context<'a, 'b> {
@@ -27,6 +38,10 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn command_line_mut(&mut self) -> &mut CommandLine {
         self.ui.command_line_mut()
+    }
+
+    pub fn external_ctx(&self) -> ExternalContext {
+        ExternalContext::new(self.ui.event_tx.clone())
     }
 
     pub fn push_page(&mut self, page: Page) {
@@ -69,7 +84,7 @@ impl<'a, 'b> Context<'a, 'b> {
     pub fn change_dir(&mut self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         std::env::set_current_dir(&path).context("cd failed")?;
         std::env::set_var("PWD", path.as_ref());
-        self.ui.direnv = Direnv::new(std::env::current_dir()?)?;
+        self.ui.direnv = Direnv::new(self.external_ctx(), std::env::current_dir()?)?;
         Ok(())
     }
 

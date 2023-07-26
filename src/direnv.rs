@@ -1,81 +1,67 @@
-use std::process::{self, Child, Stdio};
-use std::{mem, path::PathBuf};
+use std::{path::PathBuf, process::Stdio};
 
 use anyhow::{bail, Context};
+use once_cell::unsync::Lazy;
+
+use crate::ui::ExternalContext;
+
+type Envs = anyhow::Result<Vec<(String, String)>>;
 
 #[derive(Debug)]
 pub struct Direnv {
-    dir: PathBuf,
-    child_or_env: ChildOrEnv,
-}
-
-#[derive(Debug)]
-enum ChildOrEnv {
-    Child(Child),
-    Env(Vec<(String, String)>),
-    Error(String),
+    env: Lazy<Envs, Box<dyn FnOnce() -> Envs>>,
 }
 
 impl Direnv {
-    pub fn new(dir: PathBuf) -> anyhow::Result<Self> {
-        let child = process::Command::new("direnv")
+    pub fn new(ctx: ExternalContext, dir: PathBuf) -> anyhow::Result<Self> {
+        let (tx, rx) = flume::bounded(1);
+        tokio::spawn(async move {
+            // FIXME
+            let _ = tx.send(Self::background(ctx, dir).await);
+        });
+
+        Ok(Self {
+            env: Lazy::new(Box::new(move || {
+                rx.recv().context("channel disconnected")?
+            })),
+        })
+    }
+
+    async fn background(
+        ctx: ExternalContext,
+        dir: PathBuf,
+    ) -> anyhow::Result<Vec<(String, String)>> {
+        let output = tokio::process::Command::new("direnv")
             .arg("exec")
             .arg(&dir)
             .arg("env")
             .arg("-0")
             .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            // TODO: handle failures better
-            .context("running direnv")?;
+            .kill_on_drop(true)
+            .output()
+            .await?;
 
-        Ok(Self {
-            child_or_env: ChildOrEnv::Child(child),
-            dir,
-        })
+        if !output.status.success() {
+            bail!("direnv failed: {}", String::from_utf8(output.stderr)?);
+        }
+
+        Ok(String::from_utf8(output.stdout)?
+            .split_terminator('\0')
+            .flat_map(|x| x.split_once('='))
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect())
     }
 
     fn env(&mut self) -> anyhow::Result<&[(String, String)]> {
-        let mut child_or_env = mem::replace(&mut self.child_or_env, ChildOrEnv::Env(vec![]));
-        if let ChildOrEnv::Child(c) = child_or_env {
-            let output = c.wait_with_output()?;
-            child_or_env = if output.status.success() {
-                let buf = String::from_utf8(output.stdout)?;
-                let env = buf
-                    .split_terminator('\0')
-                    .flat_map(|x| x.split_once('='))
-                    .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                    .collect();
-                ChildOrEnv::Env(env)
-            } else {
-                ChildOrEnv::Error(
-                    String::from_utf8(output.stderr)
-                        .unwrap_or_else(|_| String::from("<invalid utf8>")),
-                )
-            };
-        };
-        self.child_or_env = child_or_env;
-        match &self.child_or_env {
-            ChildOrEnv::Child(_) => unreachable!(),
-            ChildOrEnv::Env(e) => Ok(e),
-            ChildOrEnv::Error(e) => bail!("{e}"),
+        match self.env.as_ref() {
+            Ok(env) => Ok(env),
+            Err(e) => bail!("{e}"),
         }
     }
 
-    pub fn hook(&mut self, cmd: &mut process::Command) -> anyhow::Result<()> {
+    pub fn hook(&mut self, cmd: &mut std::process::Command) -> anyhow::Result<()> {
         let env = self.env()?;
         cmd.envs(env.iter().cloned());
         Ok(())
-    }
-}
-
-impl Drop for Direnv {
-    fn drop(&mut self) {
-        if let ChildOrEnv::Child(mut c) =
-            mem::replace(&mut self.child_or_env, ChildOrEnv::Env(vec![]))
-        {
-            c.kill().expect("unable to kill direnv");
-        }
     }
 }

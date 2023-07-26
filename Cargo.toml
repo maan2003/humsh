@@ -9,6 +9,7 @@ crossterm = { version = "0.26.1", features = ["event-stream"] }
 csv = "1.2.2"
 dirs = "5.0.1"
 flume = "0.10.14"
+once_cell = "1.18.0"
 serde = { version = "1.0.174", features = ["derive"] }
 tokio = { version = "1.29.1", features = ["full"] }
 tokio-stream = "0.1.14"

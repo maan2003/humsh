@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{bail, Context as _};
-use crossterm::event;
 use crossterm::{cursor, execute, queue, style::*, terminal};
 use tokio_stream::StreamExt;
 
@@ -12,7 +11,7 @@ use crate::command_line::CommandLine;
 use crate::data::{self, Button, Callback, Group, Page, ToggleFlag};
 use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
-pub use context::Context;
+pub use context::{Context, ExternalContext};
 use input::KeyHandler;
 
 mod context;
@@ -41,7 +40,10 @@ impl Ui {
         Ok(Self {
             stack: vec![(program.base, program.start)],
             key_handler: KeyHandler::new(),
-            direnv: Direnv::new(std::env::current_dir()?)?,
+            direnv: Direnv::new(
+                ExternalContext::new(event_tx.clone()),
+                std::env::current_dir()?,
+            )?,
             showing_cmd: false,
             multi_term: multi_term::detect(),
             event_tx,

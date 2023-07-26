@@ -213,6 +213,7 @@ dependencies = [
  "csv",
  "dirs",
  "flume",
+ "once_cell",
  "serde",
  "tokio",
  "tokio-stream",
