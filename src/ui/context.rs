@@ -1,4 +1,8 @@
-use std::{path::Path, process};
+use std::{
+    path::Path,
+    process,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use anyhow::Context as _;
 
@@ -17,9 +21,36 @@ pub struct ExternalContext {
     tx: flume::Sender<Event>,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy, Hash)]
+pub struct StatusId(pub u64);
+
 impl ExternalContext {
     pub(super) fn new(tx: flume::Sender<Event>) -> Self {
         Self { tx }
+    }
+
+    pub async fn begin_status(&self, message: impl Into<String>) -> StatusId {
+        static STATUS_ID: AtomicU64 = AtomicU64::new(0);
+        let status_id = StatusId(STATUS_ID.fetch_add(0, Ordering::SeqCst));
+        self.tx
+            .send_async(Event::Status(status_id, message.into()))
+            .await
+            .expect("ui is not running");
+        status_id
+    }
+
+    pub async fn update_status(&self, id: StatusId, message: impl Into<String>) {
+        self.tx
+            .send_async(Event::Status(id, message.into()))
+            .await
+            .expect("ui is not running")
+    }
+
+    pub async fn remove_status(&self, id: StatusId) {
+        self.tx
+            .send_async(Event::RemoveStatus(id))
+            .await
+            .expect("ui is not running")
     }
 }
 

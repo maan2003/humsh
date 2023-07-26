@@ -17,7 +17,10 @@ impl Direnv {
         let (tx, rx) = flume::bounded(1);
         tokio::spawn(async move {
             // FIXME
-            let _ = tx.send(Self::background(ctx, dir).await);
+            // FIXME: stop direnv if dropped
+            let id = ctx.begin_status("Direnv Loading").await;
+            let _ = tx.send(Self::background(dir).await);
+            ctx.remove_status(id).await;
         });
 
         Ok(Self {
@@ -27,10 +30,7 @@ impl Direnv {
         })
     }
 
-    async fn background(
-        ctx: ExternalContext,
-        dir: PathBuf,
-    ) -> anyhow::Result<Vec<(String, String)>> {
+    async fn background(dir: PathBuf) -> anyhow::Result<Vec<(String, String)>> {
         let output = tokio::process::Command::new("direnv")
             .arg("exec")
             .arg(&dir)

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::io::{StdoutLock, Write};
 use std::path::PathBuf;
@@ -11,7 +12,7 @@ use crate::command_line::CommandLine;
 use crate::data::{self, Button, Callback, Group, Page, ToggleFlag};
 use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
-pub use context::{Context, ExternalContext};
+pub use context::{Context, ExternalContext, StatusId};
 use input::KeyHandler;
 
 mod context;
@@ -22,6 +23,8 @@ pub type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 #[derive(Debug)]
 pub enum Event {
     Term(crossterm::event::Event),
+    Status(StatusId, String),
+    RemoveStatus(StatusId),
 }
 
 pub struct Ui {
@@ -32,6 +35,7 @@ pub struct Ui {
     multi_term: Option<MultiTerm>,
     event_tx: flume::Sender<Event>,
     event_rx: flume::Receiver<Event>,
+    status: BTreeMap<StatusId, String>,
 }
 
 impl Ui {
@@ -48,6 +52,7 @@ impl Ui {
             multi_term: multi_term::detect(),
             event_tx,
             event_rx,
+            status: BTreeMap::new(),
         })
     }
 
@@ -198,6 +203,14 @@ impl Ui {
                 )
             }
             Event::Term(_) => Ok(None),
+            Event::Status(id, text) => {
+                self.status.insert(id, text);
+                Ok(None)
+            }
+            Event::RemoveStatus(id) => {
+                self.status.remove(&id);
+                Ok(None)
+            }
         }
     }
 
@@ -218,6 +231,7 @@ impl Ui {
             }
         }
 
+        self.draw_status(stdout)?;
         self.draw_prompt(stdout)?;
         stdout.flush()?;
         Ok(())
@@ -257,6 +271,25 @@ impl Ui {
             )?;
         }
         queue!(stdout, NextLine, NextLine)?;
+        Ok(())
+    }
+
+    fn draw_status(&self, stdout: Stdout) -> crossterm::Result<()> {
+        if self.status.is_empty() {
+            return Ok(());
+        }
+
+        let mut first = true;
+        queue!(stdout, Print("[ "))?;
+        for val in self.status.values() {
+            queue!(stdout, Print(val))?;
+            if first {
+                first = false;
+            } else {
+                queue!(stdout, Print("∙"))?;
+            }
+        }
+        queue!(stdout, Print(" ]"), NextLine, NextLine)?;
         Ok(())
     }
 
