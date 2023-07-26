@@ -2,6 +2,7 @@ use std::{path::PathBuf, process::Stdio};
 
 use anyhow::{bail, Context};
 use once_cell::unsync::Lazy;
+use tokio::task::JoinHandle;
 
 use crate::ui::ExternalContext;
 
@@ -10,14 +11,14 @@ type Envs = anyhow::Result<Vec<(String, String)>>;
 #[derive(Debug)]
 pub struct Direnv {
     env: Lazy<Envs, Box<dyn FnOnce() -> Envs>>,
+    join_handle: JoinHandle<()>,
 }
 
 impl Direnv {
     pub fn new(ctx: ExternalContext, dir: PathBuf) -> anyhow::Result<Self> {
         let (tx, rx) = flume::bounded(1);
-        tokio::spawn(async move {
+        let join_handle = tokio::spawn(async move {
             // FIXME
-            // FIXME: stop direnv if dropped
             let id = ctx.begin_status("Direnv Loading").await;
             let _ = tx.send(Self::background(dir).await);
             ctx.remove_status(id).await;
@@ -27,6 +28,7 @@ impl Direnv {
             env: Lazy::new(Box::new(move || {
                 rx.recv().context("channel disconnected")?
             })),
+            join_handle,
         })
     }
 
@@ -63,5 +65,11 @@ impl Direnv {
         let env = self.env()?;
         cmd.envs(env.iter().cloned());
         Ok(())
+    }
+}
+
+impl Drop for Direnv {
+    fn drop(&mut self) {
+        self.join_handle.abort()
     }
 }
