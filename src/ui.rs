@@ -271,7 +271,7 @@ impl Ui {
                 Print(handle.number()),
                 Print(" "),
                 Print(handle.name()),
-                Print("\t")
+                Print("  ")
             )?;
         }
         queue!(stdout, NextLine, NextLine)?;
