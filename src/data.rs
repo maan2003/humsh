@@ -206,8 +206,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 .join("humsh/commands.toml"),
             builtin_page,
         )?,
-    )?
-    .with_status("> Please support humsh at https://github.com/sponsors/maan2003\n"))
+    )?)
 }
 
 fn git_status() -> anyhow::Result<String> {
