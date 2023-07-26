@@ -1,6 +1,6 @@
 use std::{env, io, process::Command};
 
-use anyhow::anyhow;
+use anyhow::Context as _;
 
 enum TermDetect {
     Tmux,
@@ -47,7 +47,7 @@ impl MultiTerm {
             .from_reader(io::Cursor::new(output.stdout))
             .deserialize()
             .next()
-            .ok_or_else(|| anyhow!("Invalid tmux output"))??)
+            .context("invalid tmux output")??)
     }
 
     pub fn list_windows(&self) -> anyhow::Result<Vec<TabHandle>> {

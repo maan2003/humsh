@@ -202,7 +202,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
         maybe_merge(
             "User commands",
             &dirs::config_dir()
-                .ok_or_else(|| anyhow!("config dir not found"))?
+                .context("config dir not found")?
                 .join("humsh/commands.toml"),
             builtin_page,
         )?,
