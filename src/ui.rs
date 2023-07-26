@@ -157,7 +157,11 @@ impl Ui {
 
     fn enter_ui(&self, stdout: Stdout) -> crossterm::Result<()> {
         terminal::enable_raw_mode()?;
-        execute!(stdout, terminal::EnterAlternateScreen)?;
+        execute!(
+            stdout,
+            terminal::EnterAlternateScreen,
+            crossterm::event::EnableFocusChange
+        )?;
         Ok(())
     }
 
@@ -167,6 +171,7 @@ impl Ui {
         execute!(
             stdout,
             terminal::LeaveAlternateScreen,
+            crossterm::event::DisableFocusChange,
             cursor::MoveTo(0, height - 1),
         )?;
         terminal::disable_raw_mode()?;
