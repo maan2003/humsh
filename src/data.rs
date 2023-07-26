@@ -2,7 +2,7 @@ use std::path::Path;
 use std::process::Command;
 use std::{process::Stdio, sync::Arc};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::Context as _;
 
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 use crate::config::Config;
