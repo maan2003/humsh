@@ -222,7 +222,6 @@ impl Ui {
         if let Some(mux) = &mut self.multi_term {
             if let crossterm::event::KeyCode::Char(c) = key.code {
                 if let Some(d) = c.to_digit(10) {
-                    dbg!(d);
                     if let Some(handle) = mux
                         .list_windows()?
                         .into_iter()
