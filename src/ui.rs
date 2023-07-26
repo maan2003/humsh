@@ -199,18 +199,9 @@ impl Ui {
         Ok(())
     }
 
-    pub fn process_event(&mut self, event: Event) -> crossterm::Result<Option<Arc<dyn Callback>>> {
+    pub fn process_event(&mut self, event: Event) -> anyhow::Result<Option<Arc<dyn Callback>>> {
         match event {
-            Event::Term(crossterm::event::Event::Key(key)) => {
-                let page = &self.stack.last().expect("stack must not be empty").1;
-                self.key_handler.handle_key(
-                    key,
-                    page.groups
-                        .iter()
-                        .flat_map(|x| &x.buttons)
-                        .map(|b| (&b.key, &b.callback)),
-                )
-            }
+            Event::Term(crossterm::event::Event::Key(key)) => self.handle_key(key),
             Event::Term(_) => Ok(None),
             Event::Status(id, text) => {
                 self.status.insert(id, text);
@@ -221,6 +212,35 @@ impl Ui {
                 Ok(None)
             }
         }
+    }
+
+    fn handle_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+    ) -> anyhow::Result<Option<Arc<dyn Callback>>> {
+        let page = &self.stack.last().expect("stack must not be empty").1;
+        if let Some(mux) = &mut self.multi_term {
+            if let crossterm::event::KeyCode::Char(c) = key.code {
+                if let Some(d) = c.to_digit(10) {
+                    dbg!(d);
+                    if let Some(handle) = mux
+                        .list_windows()?
+                        .into_iter()
+                        .find(|w| w.number() == d as u64)
+                    {
+                        mux.focus(&handle)?;
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+        self.key_handler.handle_key(
+            key,
+            page.groups
+                .iter()
+                .flat_map(|x| &x.buttons)
+                .map(|b| (&b.key, &b.callback)),
+        )
     }
 
     pub fn draw(&self, stdout: Stdout) -> anyhow::Result<()> {

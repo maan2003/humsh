@@ -62,6 +62,15 @@ impl MultiTerm {
             .deserialize()
             .collect::<Result<_, _>>()?)
     }
+
+    pub fn focus(&self, handle: &TabHandle) -> anyhow::Result<()> {
+        let _ = Command::new("tmux")
+            .arg("select-window")
+            .arg("-t")
+            .arg(&handle.window_id)
+            .output()?;
+        Ok(())
+    }
 }
 
 pub fn detect() -> Option<MultiTerm> {

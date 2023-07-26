@@ -28,7 +28,7 @@ impl KeyHandler {
         &mut self,
         key: KeyEvent,
         bindings: impl Iterator<Item = (&'a Keybind, &'a Arc<dyn Callback>)>,
-    ) -> crossterm::Result<Option<Arc<dyn Callback>>> {
+    ) -> anyhow::Result<Option<Arc<dyn Callback>>> {
         let key = match key.code {
             KeyCode::Char('`') => {
                 self.reset();
