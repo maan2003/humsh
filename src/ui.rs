@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context as _};
 use crossterm::{cursor, execute, queue, style::*, terminal};
+use tokio::runtime;
 use tokio_stream::StreamExt;
 
 use crate::command_line::CommandLine;
@@ -83,21 +84,24 @@ impl Ui {
     pub fn run(mut self) -> anyhow::Result<()> {
         let mut stdout = std::io::stdout().lock();
         terminal::enable_raw_mode()?;
-        let event_tx = self.event_tx.clone();
-        tokio::spawn(async move {
-            while let Some(event) = crossterm::event::EventStream::new().next().await {
-                event_tx.send_async(Event::Term(event?)).await?;
-            }
-            anyhow::Ok(())
-        });
+        let mut event_stream = crossterm::event::EventStream::new();
         loop {
             terminal::enable_raw_mode()?;
             if !self.showing_cmd {
                 self.draw(&mut stdout)?;
             }
-            let Ok(event) = self.event_rx.recv() else {
-                break;
-            };
+            let event: anyhow::Result<_> = runtime::Handle::current().block_on(async {
+                tokio::select! {
+                    Some(term) = event_stream.next() => {
+                        Ok(Some(Event::Term(term?)))
+                    }
+                    Ok(event) = self.event_rx.recv_async() => {
+                        Ok(Some(event))
+                    }
+                    else => Ok(None)
+                }
+            });
+            let Some(event) = event? else { break };
             if let Some(callback) = self.process_event(event)? {
                 let mut exit = false;
                 let ctx = Context {
