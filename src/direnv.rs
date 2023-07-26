@@ -18,7 +18,7 @@ impl Direnv {
     pub fn new(ctx: ExternalContext, dir: PathBuf) -> anyhow::Result<Self> {
         let (tx, rx) = flume::bounded(1);
         let join_handle = tokio::spawn(async move {
-            let id = ctx.begin_status("Direnv Loading").await;
+            let id = ctx.begin_status("direnv loading").await;
             let _ = tx.send(Self::background(dir).await);
             ctx.remove_status(id).await;
         });

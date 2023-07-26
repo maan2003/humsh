@@ -235,7 +235,6 @@ impl Ui {
             }
         }
 
-        self.draw_status(stdout)?;
         self.draw_prompt(stdout)?;
         stdout.flush()?;
         Ok(())
@@ -247,9 +246,10 @@ impl Ui {
         let dir_name = dir.file_name().and_then(OsStr::to_str).unwrap_or("/");
 
         let cmd = self.command_line().to_string();
+        queue!(stdout, PrintStyledContent(dir_name.with(Color::Cyan)))?;
+        self.draw_status(stdout)?;
         queue!(
             stdout,
-            PrintStyledContent(dir_name.with(Color::Cyan)),
             PrintStyledContent(" λ ".with(Color::Yellow)),
             Print(&cmd),
             Print(if cmd.is_empty() { "" } else { " " }),
@@ -284,16 +284,23 @@ impl Ui {
         }
 
         let mut first = true;
-        queue!(stdout, Print("[ "))?;
+        queue!(
+            stdout,
+            Print(" "),
+            PrintStyledContent("[".with(Color::Magenta))
+        )?;
         for val in self.status.values() {
-            queue!(stdout, Print(val))?;
+            queue!(
+                stdout,
+                PrintStyledContent(val.as_str().with(Color::Magenta))
+            )?;
             if first {
                 first = false;
             } else {
-                queue!(stdout, Print("∙"))?;
+                queue!(stdout, PrintStyledContent("∙".with(Color::Magenta)))?;
             }
         }
-        queue!(stdout, Print(" ]"), NextLine, NextLine)?;
+        queue!(stdout, PrintStyledContent("]".with(Color::Magenta)))?;
         Ok(())
     }
 
