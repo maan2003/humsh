@@ -6,7 +6,7 @@
   in
   {
     devShells.${system}.default = pkgs.mkShell {
-      nativeBuildInputs = with pkgs; [ cargo rustc clippy rustfmt rust-analyzer zoxide fzf fd nnn];
+      nativeBuildInputs = with pkgs; [ cargo rustc clippy rustfmt rust-analyzer zoxide fzf fd ];
     };
   };
 }
