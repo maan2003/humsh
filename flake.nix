@@ -5,8 +5,8 @@
     pkgs = import nixpkgs { inherit system; };
   in
   {
-    overlay = { rustPlatform, ... }: super: {
-      humsh = rustPlatform.buildRustPackage {
+    overlay = self: super: {
+      humsh = self.rustPlatform.buildRustPackage {
         pname = "humsh";
         version = "0.1.0";
         src = inputs.self;
