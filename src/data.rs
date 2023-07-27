@@ -180,7 +180,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 ctx.replace_page(home_page()?);
                 Ok(())
             }),
-            button("s", "Shell Command", |mut ctx: Context| {
+            button("S", "Shell Command", |mut ctx: Context| {
                 ctx.leave_ui()?;
                 let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
                 ctx.run_command(&mut Command::new(shell))?.wait()?;
