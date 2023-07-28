@@ -377,6 +377,20 @@ impl Ui {
         }
         Ok(())
     }
+
+    pub fn read_input(&self, stdout: Stdout) -> anyhow::Result<String> {
+        execute!(
+            stdout,
+            terminal::Clear(terminal::ClearType::CurrentLine),
+            cursor::MoveToColumn(0),
+            Print("> ")
+        )?;
+        terminal::disable_raw_mode()?;
+        let mut buf = String::new();
+        std::io::stdin().read_line(&mut buf)?;
+        terminal::enable_raw_mode()?;
+        Ok(buf)
+    }
 }
 
 fn pwd() -> Result<PathBuf, anyhow::Error> {

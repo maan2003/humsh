@@ -145,4 +145,8 @@ impl<'a, 'b> Context<'a, 'b> {
         self.ui.direnv.hook(command)?;
         Ok(command.spawn()?)
     }
+
+    pub fn read_input(&mut self) -> anyhow::Result<String> {
+        self.ui.read_input(self.stdout)
+    }
 }

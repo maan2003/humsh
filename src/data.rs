@@ -180,7 +180,17 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 ctx.replace_page(home_page()?);
                 Ok(())
             }),
-            button("S", "Shell Command", |mut ctx: Context| {
+            button("s", "Shell Command", |mut ctx: Context| {
+                let input = ctx.read_input()?;
+                ctx.leave_ui()?;
+                ctx.show_cmd()?;
+                ctx.hint_running_command(&input)?;
+                let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
+                ctx.run_command(&mut Command::new(shell).arg("-c").arg(input))?
+                    .wait()?;
+                Ok(())
+            }),
+            button("S", "Shell", |mut ctx: Context| {
                 ctx.leave_ui()?;
                 let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
                 ctx.run_command(&mut Command::new(shell))?.wait()?;
