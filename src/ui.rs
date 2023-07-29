@@ -15,9 +15,11 @@ use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
 pub use context::{Context, ExternalContext, StatusId};
 use input::KeyHandler;
+pub use style::Style;
 
 mod context;
 mod input;
+mod style;
 
 pub type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 
@@ -37,6 +39,7 @@ pub struct Ui {
     event_tx: flume::Sender<Event>,
     event_rx: flume::Receiver<Event>,
     status: BTreeMap<StatusId, String>,
+    style: Style,
 }
 
 impl Ui {
@@ -54,6 +57,7 @@ impl Ui {
             event_tx,
             event_rx,
             status: BTreeMap::new(),
+            style: style::builtin(),
         })
     }
 
@@ -115,7 +119,7 @@ impl Ui {
                     self.showing_cmd = true;
                     execute!(
                         stdout,
-                        PrintStyledContent(format!("! {:#}", e).with(Color::Red)),
+                        PrintStyledContent(self.style.error.apply(format!("! {:#}", e))),
                         NextLine,
                     )?;
                 }
@@ -150,7 +154,7 @@ impl Ui {
     fn hint_running_command(&self, cmd: &str, stdout: Stdout) -> crossterm::Result<()> {
         execute!(
             stdout,
-            PrintStyledContent(format!("> {cmd}\n").with(Color::DarkGreen))
+            PrintStyledContent(self.style.command.apply(format!("> {cmd}\n")))
         )?;
         Ok(())
     }
@@ -272,11 +276,14 @@ impl Ui {
         let dir_name = dir.file_name().and_then(OsStr::to_str).unwrap_or("/");
 
         let cmd = self.command_line().to_string();
-        queue!(stdout, PrintStyledContent(dir_name.with(Color::Cyan)))?;
+        queue!(
+            stdout,
+            PrintStyledContent(self.style.directory.apply(dir_name))
+        )?;
         self.draw_status(stdout)?;
         queue!(
             stdout,
-            PrintStyledContent(" λ ".with(Color::Yellow)),
+            PrintStyledContent(self.style.prompt_char),
             Print(&cmd),
             Print(if cmd.is_empty() { "" } else { " " }),
             Print(self.key_handler.prefix()),
@@ -287,7 +294,7 @@ impl Ui {
     fn draw_tabs(&self, tabs: &[TabHandle], stdout: Stdout) -> crossterm::Result<()> {
         queue!(
             stdout,
-            Print("Tabs".with(Color::Blue)),
+            Print(self.style.heading.apply("Tabs")),
             NextLine,
             Print(" ")
         )?;
@@ -313,20 +320,20 @@ impl Ui {
         queue!(
             stdout,
             Print(" "),
-            PrintStyledContent("[".with(Color::Magenta))
+            PrintStyledContent(self.style.status.apply("["))
         )?;
         for val in self.status.values() {
             queue!(
                 stdout,
-                PrintStyledContent(val.as_str().with(Color::Magenta))
+                PrintStyledContent(self.style.status.apply(val.as_str()))
             )?;
             if first {
                 first = false;
             } else {
-                queue!(stdout, PrintStyledContent("∙".with(Color::Magenta)))?;
+                queue!(stdout, PrintStyledContent(self.style.status.apply("∙")))?;
             }
         }
-        queue!(stdout, PrintStyledContent("]".with(Color::Magenta)))?;
+        queue!(stdout, PrintStyledContent(self.style.status.apply("]")))?;
         Ok(())
     }
 
@@ -344,7 +351,7 @@ impl Ui {
     fn draw_group(&self, group: &Group, stdout: Stdout) -> crossterm::Result<()> {
         queue!(
             stdout,
-            PrintStyledContent((&*group.description).with(Color::Blue)),
+            PrintStyledContent(self.style.heading.apply(&*group.description)),
             NextLine,
         )?;
         for button in &group.buttons {
@@ -358,7 +365,7 @@ impl Ui {
         queue!(
             stdout,
             Print(" "),
-            PrintStyledContent((&*button.key.0).with(Color::Grey)),
+            PrintStyledContent(self.style.button.apply(&*button.key.0)),
             Print(" "),
             Print(&button.description),
         )?;
@@ -367,11 +374,11 @@ impl Ui {
             queue!(
                 stdout,
                 Print(" ("),
-                PrintStyledContent(a.value.to_string().with(if selected {
-                    Color::Cyan
+                PrintStyledContent(if selected {
+                    self.style.flag_on.apply(a.value.to_string())
                 } else {
-                    Color::DarkGrey
-                })),
+                    self.style.flag_off.apply(a.value.to_string())
+                }),
                 Print(")")
             )?;
         }
@@ -381,8 +388,8 @@ impl Ui {
     pub fn read_input(&self, stdout: Stdout) -> anyhow::Result<String> {
         execute!(
             stdout,
-            terminal::Clear(terminal::ClearType::CurrentLine),
             cursor::MoveToColumn(0),
+            terminal::Clear(terminal::ClearType::CurrentLine),
             Print("> ")
         )?;
         terminal::disable_raw_mode()?;
@@ -403,7 +410,6 @@ struct NextLine;
 impl crossterm::Command for NextLine {
     fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
         Print("\r\n").write_ansi(f)?;
-        cursor::MoveToColumn(0).write_ansi(f)?;
         Ok(())
     }
 }
