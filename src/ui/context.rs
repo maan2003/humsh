@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Context as _;
 
-use crate::{command_line::CommandLine, data::Page, direnv::Direnv};
+use crate::{command_line::CommandLine, data::Page, direnv::Direnv, util::CheckExitStatus};
 
 use super::{Event, Stdout, Ui};
 
@@ -128,13 +128,22 @@ impl<'a, 'b> Context<'a, 'b> {
         if let Some(mux) = self.ui.multi_term() {
             mux.run(command)
         } else {
-            command.spawn()?.wait()?;
+            command.spawn()?.wait()?.check_exit_status()?;
             Ok(())
         }
     }
 
     pub fn hint_running_command(&mut self, cmd: &str) -> anyhow::Result<()> {
         self.ui.hint_running_command(cmd, self.stdout)?;
+        Ok(())
+    }
+
+    pub fn run_command_in_foreground(
+        &mut self,
+        command: &mut process::Command,
+    ) -> anyhow::Result<()> {
+        self.leave_ui()?;
+        self.run_command(command)?.wait()?.check_exit_status()?;
         Ok(())
     }
 

@@ -7,6 +7,7 @@ mod data;
 mod direnv;
 mod multi_term;
 mod ui;
+mod util;
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()

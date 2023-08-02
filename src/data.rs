@@ -7,6 +7,7 @@ use anyhow::Context as _;
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 use crate::config::Config;
 use crate::ui::Context;
+use crate::util::CheckExitStatus;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(pub String);
@@ -186,14 +187,13 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 ctx.show_cmd()?;
                 ctx.hint_running_command(&input)?;
                 let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
-                ctx.run_command(&mut Command::new(shell).arg("-c").arg(input))?
-                    .wait()?;
+                ctx.run_command_in_foreground(&mut Command::new(shell).arg("-c").arg(input))?;
                 Ok(())
             }),
             button("s", "Shell", |mut ctx: Context| {
                 ctx.leave_ui()?;
                 let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
-                ctx.run_command(&mut Command::new(shell))?.wait()?;
+                ctx.run_command_in_foreground(&mut Command::new(shell))?;
                 Ok(())
             }),
         ],
@@ -362,19 +362,18 @@ pub fn git() -> anyhow::Result<Page> {
             }),
             button("d", "Diff", |mut ctx: Context| {
                 ctx.leave_ui()?;
-                ctx.run_command(Command::new("git").arg("diff"))?.wait()?;
+                ctx.run_command_in_foreground(Command::new("git").arg("diff"))?;
                 ctx.show_cmd()?;
                 Ok(())
             }),
             button("l", "Log", |mut ctx: Context| {
                 ctx.leave_ui()?;
-                ctx.run_command(
+                ctx.run_command_in_foreground(
                     Command::new("git")
                         .arg("log")
                         .arg("--format=oneline")
                         .arg("--abbrev-commit"),
-                )?
-                .wait()?;
+                )?;
                 ctx.show_cmd()?;
                 Ok(())
             }),

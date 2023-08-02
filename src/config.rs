@@ -41,7 +41,7 @@ impl Config {
                                 ctx.leave_ui()?;
                                 ctx.show_cmd()?;
                                 ctx.hint_running_command(&x.command)?;
-                                ctx.run_command(&mut command)?.wait()?;
+                                ctx.run_command_in_foreground(&mut command)?;
                             }
                             Ok(())
                         })

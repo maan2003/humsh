@@ -40,7 +40,9 @@ impl MultiTerm {
             )
             .arg(command.get_program())
             .args(command.get_args())
-            .output()?;
+            .output()?
+            .check_exit_status()
+            .context("running tmux new window")?;
 
         Ok(csv::ReaderBuilder::new()
             .has_headers(false)
