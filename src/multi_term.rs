@@ -2,6 +2,8 @@ use std::{env, io, process::Command};
 
 use anyhow::Context as _;
 
+use crate::util::CheckExitStatus;
+
 enum TermDetect {
     Tmux,
 }
@@ -29,15 +31,25 @@ impl TabHandle {
 
 impl MultiTerm {
     pub fn run(&mut self, command: &mut Command) -> anyhow::Result<()> {
-        let output = Command::new("tmux")
-            .arg("new-window")
+        let mut cmd = Command::new("tmux");
+        cmd.arg("new-window")
             .arg("-F#{window_id},#{window_name},#{window_index}")
             .arg("-P")
             .envs(
                 command
                     .get_envs()
                     .filter_map(|(key, value)| Some((key, value?))),
-            )
+            );
+
+        for (key, value) in command.get_envs() {
+            if let Some(val) = value {
+                let key = key.to_str().context("must be valid utf8")?;
+                let val = val.to_str().context("must be valid utf8")?;
+                cmd.arg(format!("-e{key}={val}"));
+            }
+        }
+
+        let output = cmd
             .arg(command.get_program())
             .args(command.get_args())
             .output()?
