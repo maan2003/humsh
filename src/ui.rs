@@ -171,14 +171,14 @@ impl Ui {
 
     fn leave_ui(&self, stdout: Stdout) -> crossterm::Result<()> {
         // always write at end of terminal
-        let (_, height) = terminal::size()?;
+        // let (_, height) = terminal::size()?;
+        terminal::disable_raw_mode()?;
         execute!(
             stdout,
             terminal::LeaveAlternateScreen,
             crossterm::event::DisableFocusChange,
-            cursor::MoveTo(0, height - 1),
+            // cursor::MoveTo(0, height - 1),
         )?;
-        terminal::disable_raw_mode()?;
         Ok(())
     }
 
