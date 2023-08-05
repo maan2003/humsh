@@ -98,7 +98,7 @@ fn select_branch(extra_args: &str) -> anyhow::Result<String> {
 fn select_directory() -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
-        .arg("cat <(zoxide query -l) <(fd --follow --maxdepth 3 -t d) | fzf")
+        .arg("cat <(zoxide query -l) <(fd --follow --maxdepth 3 -t d) | fzf --tiebreak=end,index")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
