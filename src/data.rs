@@ -7,7 +7,6 @@ use anyhow::Context as _;
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 use crate::config::Config;
 use crate::ui::Context;
-use crate::util::CheckExitStatus;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(pub String);
@@ -98,7 +97,7 @@ fn select_branch(extra_args: &str) -> anyhow::Result<String> {
 fn select_directory() -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
-        .arg("cat <(zoxide query -l) <(fd --follow --maxdepth 3 -t d) | fzf --tiebreak=end,index")
+        .arg(r#"cat <(zoxide query -l) <(fd --follow --maxdepth 3 -t d . "$PWD") | sed "s:/$::" | awk '!seen[$0]++' | fzf --tiebreak=end,index"#)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
