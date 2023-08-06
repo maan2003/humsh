@@ -1,5 +1,8 @@
+mod cp;
+
 use std::path::Path;
 use std::process::Command;
+use std::sync::Mutex;
 use std::{process::Stdio, sync::Arc};
 
 use anyhow::Context as _;
@@ -202,6 +205,12 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 ctx.leave_ui()?;
                 let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
                 ctx.run_command_in_foreground(&mut Command::new(shell))?;
+                Ok(())
+            }),
+            button("C", "Competitive programming", |mut ctx: Context| {
+                let current_dir = std::env::current_dir()?;
+                let cp = cp::Cp::new(current_dir)?;
+                ctx.push_page(cp::cp_page(Arc::new(Mutex::new(cp)))?);
                 Ok(())
             }),
         ],
