@@ -16,6 +16,7 @@ pub struct Button {
     pub key: Keybind,
     pub description: String,
     pub callback: Arc<dyn Callback>,
+    pub hint: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +77,13 @@ impl Page {
     pub fn merge(mut self, other: Page) -> Page {
         self.groups.extend(other.groups);
         self.status = other.status.or(self.status);
+        self
+    }
+}
+
+impl Button {
+    pub fn with_hint(mut self, hint: impl Into<Option<String>>) -> Self {
+        self.hint = hint.into();
         self
     }
 }
@@ -145,6 +153,7 @@ pub fn button(
         key: Keybind(key.into()),
         description: description.into(),
         callback: Arc::new(callback),
+        hint: None,
     }
 }
 

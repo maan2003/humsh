@@ -369,7 +369,14 @@ impl Ui {
             Print(" "),
             Print(&button.description),
         )?;
-        if let Some(ToggleFlag(a)) = &button.callback.as_any().downcast_ref::<ToggleFlag>() {
+        if let Some(hint) = button.hint.as_ref() {
+            queue!(
+                stdout,
+                Print(" ("),
+                PrintStyledContent(self.style.flag_off.apply(hint)),
+                Print(")")
+            )?;
+        } else if let Some(ToggleFlag(a)) = &button.callback.as_any().downcast_ref::<ToggleFlag>() {
             let selected = self.command_line().args.contains(a);
             queue!(
                 stdout,
