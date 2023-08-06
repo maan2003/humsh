@@ -133,7 +133,7 @@ impl Cp {
 
     pub fn select_contest_with_fzf(&mut self) -> Result<()> {
         let contests = self.list_contests()?;
-        let selected_contest = self.select_with_fzf(&contests)?;
+        let selected_contest = self.select_with_fzf("Contest: ", &contests)?;
         if !contests.contains(&selected_contest) {
             self.new_contest(&selected_contest)?;
         }
@@ -143,7 +143,7 @@ impl Cp {
 
     pub fn select_problem_with_fzf(&mut self) -> Result<()> {
         let problems = self.list_problems()?;
-        let selected_problem = self.select_with_fzf(&problems)?;
+        let selected_problem = self.select_with_fzf("Problem: ", &problems)?;
         if !problems.contains(&selected_problem) {
             self.new_problem(&selected_problem)?;
         }
@@ -151,10 +151,12 @@ impl Cp {
         Ok(())
     }
 
-    fn select_with_fzf(&self, items: &[String]) -> Result<String> {
+    fn select_with_fzf(&self, prompt: &str, items: &[String]) -> Result<String> {
         let items_str = items.join("\n");
         let mut output = Command::new("fzf")
             .arg("--print-query")
+            .arg("--prompt")
+            .arg(prompt)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
@@ -162,7 +164,7 @@ impl Cp {
 
         let mut child_stdin =
             std::io::BufWriter::new(output.stdin.take().context("Failed to open fzf stdin")?);
-        writeln!(child_stdin, "{}", items_str)?;
+        write!(child_stdin, "{}", items_str)?;
         child_stdin.flush()?;
         drop(child_stdin);
 
@@ -217,7 +219,7 @@ impl Cp {
 pub fn cp_page(cp: Arc<Mutex<Cp>>) -> anyhow::Result<Page> {
     let cp_lock = cp.lock().unwrap();
     Ok(page([group(
-        "CP",
+        "Competitive programming",
         [
             button("c", "Context", {
                 let cp = cp.clone();
@@ -234,13 +236,59 @@ pub fn cp_page(cp: Arc<Mutex<Cp>>) -> anyhow::Result<Page> {
                 let cp = cp.clone();
                 move |mut ctx: Context| {
                     ctx.leave_ui()?;
-                    cp.lock().unwrap().select_problem_with_fzf()?;
+                    {
+                        let mut cp = cp.lock().unwrap();
+                        if cp.current_contest().is_none() {
+                            cp.select_contest_with_fzf()?;
+                        }
+                        cp.select_problem_with_fzf()?;
+                    }
                     let page = cp_page(cp.clone())?;
                     ctx.replace_page(page);
                     Ok(())
                 }
             })
             .with_hint(cp_lock.current_problem()),
+            button("e", "Edit", {
+                let cp = cp.clone();
+                move |mut ctx: Context| {
+                    ctx.leave_ui()?;
+                    {
+                        let mut cp = cp.lock().unwrap();
+                        if cp.current_contest().is_none() {
+                            cp.select_contest_with_fzf()?;
+                        }
+                        if cp.current_problem().is_none() {
+                            cp.select_problem_with_fzf()?;
+                        }
+                        let file = cp.current_problem_path()?.join("main.cpp");
+                        let _ = File::create(&file)?;
+                        ctx.run_command_new_term(Command::new("hx").arg(file))?;
+                    }
+                    let page = cp_page(cp.clone())?;
+                    ctx.replace_page(page);
+                    Ok(())
+                }
+            }),
+            button("t", "Test", {
+                let cp = cp.clone();
+                move |mut ctx: Context| {
+                    ctx.leave_ui()?;
+                    {
+                        let mut cp = cp.lock().unwrap();
+                        if cp.current_contest().is_none() {
+                            cp.select_contest_with_fzf()?;
+                        }
+                        if cp.current_problem().is_none() {
+                            cp.select_problem_with_fzf()?;
+                        }
+                        let file = cp.current_problem_path()?.join("main.cpp");
+                    }
+                    let page = cp_page(cp.clone())?;
+                    ctx.replace_page(page);
+                    Ok(())
+                }
+            }),
         ],
     )]))
 }

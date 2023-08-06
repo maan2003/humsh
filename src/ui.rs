@@ -373,7 +373,7 @@ impl Ui {
             queue!(
                 stdout,
                 Print(" ("),
-                PrintStyledContent(self.style.flag_off.apply(hint)),
+                PrintStyledContent(self.style.flag_on.apply(hint)),
                 Print(")")
             )?;
         } else if let Some(ToggleFlag(a)) = &button.callback.as_any().downcast_ref::<ToggleFlag>() {
