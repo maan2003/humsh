@@ -1,6 +1,8 @@
+use crate::util::CheckExitStatus;
+
 use super::*;
 
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, read_dir, File};
 use std::io::Write;
@@ -108,23 +110,27 @@ impl Cp {
         Ok(problems)
     }
 
-    pub fn new_test_case(&mut self) -> Result<PathBuf> {
-        let test_path = self.current_problem_path()?.join("tests");
+    pub fn new_test_case(&mut self) -> Result<(PathBuf, PathBuf)> {
+        let tests_path = self.current_problem_path()?.join("tests");
+        create_dir_all(&tests_path)?;
+        let id = read_dir(&tests_path)?.count() + 1;
+        let test_path = tests_path.join(format!("{}", id));
         create_dir_all(&test_path)?;
-        let id = read_dir(&test_path)?.count() + 1;
-        let test_file_path = test_path.join(format!("{}.test", id));
-        File::create(&test_file_path)?;
-        Ok(test_file_path)
+        let test_in_path = test_path.join("in");
+        let test_out_path = test_path.join("out");
+        File::create(&test_in_path)?;
+        File::create(&test_out_path)?;
+        Ok((test_in_path, test_out_path))
     }
 
-    pub fn list_test_cases(&mut self) -> Result<Vec<PathBuf>> {
+    pub fn list_test_cases(&self) -> Result<Vec<(PathBuf, PathBuf)>> {
         let test_path = self.current_problem_path()?.join("tests");
         let mut test_cases = Vec::new();
         if test_path.exists() {
             for entry in read_dir(test_path)? {
                 let entry = entry?;
-                if entry.file_type()?.is_file() {
-                    test_cases.push(entry.path());
+                if entry.file_type()?.is_dir() {
+                    test_cases.push((entry.path().join("in"), entry.path().join("out")));
                 }
             }
         }
@@ -214,6 +220,37 @@ impl Cp {
         }
         Ok(())
     }
+
+    fn run_tests(&self) -> Result<()> {
+        Command::new("c++")
+            .arg("-g")
+            .arg("-o")
+            .arg("/tmp/a.out")
+            .arg(self.code_path()?)
+            .spawn()?
+            .wait()?
+            .check_exit_status()?;
+        for (inp, expected_out) in self.list_test_cases()? {
+            let actual_out = tempfile::NamedTempFile::new()?;
+            Command::new("/tmp/a.out")
+                .stdin(File::open(inp)?)
+                .stdout(actual_out.as_file().try_clone()?)
+                .spawn()?
+                .wait()?
+                .check_exit_status()?;
+            Command::new("delta")
+                .arg(expected_out)
+                .arg(actual_out.path())
+                .spawn()?
+                .wait()?
+                .check_exit_status()?;
+        }
+        Ok(())
+    }
+
+    fn code_path(&self) -> Result<PathBuf, anyhow::Error> {
+        Ok(self.current_problem_path()?.join("main.cpp"))
+    }
 }
 
 pub fn cp_page(cp: Arc<Mutex<Cp>>) -> anyhow::Result<Page> {
@@ -270,7 +307,31 @@ pub fn cp_page(cp: Arc<Mutex<Cp>>) -> anyhow::Result<Page> {
                     Ok(())
                 }
             }),
-            button("t", "Test", {
+            button("tt", "Run Tests", {
+                let cp = cp.clone();
+                move |mut ctx: Context| {
+                    ctx.leave_ui()?;
+                    ctx.show_cmd()?;
+                    {
+                        let mut cp = cp.lock().unwrap();
+                        if cp.current_contest().is_none() {
+                            cp.select_contest_with_fzf()?;
+                        }
+                        if cp.current_problem().is_none() {
+                            cp.select_problem_with_fzf()?;
+                        }
+                        cp.run_tests()?;
+                        let (input, output) = cp.new_test_case()?;
+                        ctx.run_command_new_term(
+                            Command::new("hx").arg("--vsplit").arg(input).arg(output),
+                        )?;
+                    }
+                    let page = cp_page(cp.clone())?;
+                    ctx.replace_page(page);
+                    Ok(())
+                }
+            }),
+            button("ta", "Add Test case", {
                 let cp = cp.clone();
                 move |mut ctx: Context| {
                     ctx.leave_ui()?;
@@ -282,7 +343,10 @@ pub fn cp_page(cp: Arc<Mutex<Cp>>) -> anyhow::Result<Page> {
                         if cp.current_problem().is_none() {
                             cp.select_problem_with_fzf()?;
                         }
-                        let file = cp.current_problem_path()?.join("main.cpp");
+                        let (input, output) = cp.new_test_case()?;
+                        ctx.run_command_new_term(
+                            Command::new("hx").arg("--vsplit").arg(input).arg(output),
+                        )?;
                     }
                     let page = cp_page(cp.clone())?;
                     ctx.replace_page(page);
