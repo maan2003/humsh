@@ -51,10 +51,6 @@ impl ArgValue {
 }
 
 impl CommandLine {
-    pub fn from_args(args: BTreeSet<Arg>) -> CommandLine {
-        CommandLine { args }
-    }
-
     pub fn add_arg(&mut self, arg: Arg) {
         self.args.insert(arg);
     }
@@ -92,7 +88,8 @@ impl CommandLine {
 
 impl FromIterator<Arg> for CommandLine {
     fn from_iter<I: IntoIterator<Item = Arg>>(iter: I) -> CommandLine {
-        CommandLine::from_args(BTreeSet::from_iter(iter))
+        let args = BTreeSet::from_iter(iter);
+        CommandLine { args }
     }
 }
 
