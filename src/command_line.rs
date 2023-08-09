@@ -7,8 +7,7 @@ pub struct CommandLine {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ArgValue {
-    Simple(String),
-    Valued(String, String),
+    Single(String),
     Multi(Vec<String>),
 }
 
@@ -35,11 +34,7 @@ impl ArgOrder {
 impl ArgValue {
     pub fn add_to(&self, args: &mut Vec<String>) {
         match self {
-            ArgValue::Simple(s) => args.push(s.clone()),
-            ArgValue::Valued(k, v) => {
-                args.push(k.clone());
-                args.push(v.clone());
-            }
+            ArgValue::Single(s) => args.push(s.clone()),
             ArgValue::Multi(m) => {
                 for a in m {
                     args.push(a.clone());
@@ -74,7 +69,7 @@ impl CommandLine {
         let mut iter = self.args.iter();
         let program = iter.next().expect("must have a program name");
         let program = match &program.value {
-            ArgValue::Simple(s) => s.clone(),
+            ArgValue::Single(s) => s.clone(),
             _ => panic!("program name must be a simple argument"),
         };
         let mut cmd = std::process::Command::new(program);
@@ -107,18 +102,18 @@ impl Arg {
     }
 
     pub fn switch(value: impl Into<String>) -> Self {
-        Arg::new(ArgOrder::FLAG, ArgValue::Simple(value.into()))
+        Arg::new(ArgOrder::FLAG, ArgValue::Single(value.into()))
     }
 
     pub fn program(value: impl Into<String>) -> Self {
-        Arg::new(ArgOrder::PROGRAM, ArgValue::Simple(value.into()))
+        Arg::new(ArgOrder::PROGRAM, ArgValue::Single(value.into()))
     }
 
     pub fn subcommand(value: impl Into<String>) -> Self {
-        Arg::new(ArgOrder::SUBCOMMAND, ArgValue::Simple(value.into()))
+        Arg::new(ArgOrder::SUBCOMMAND, ArgValue::Single(value.into()))
     }
 
     pub fn positional(value: impl Into<String>) -> Self {
-        Arg::new(ArgOrder::POSITIONAL, ArgValue::Simple(value.into()))
+        Arg::new(ArgOrder::POSITIONAL, ArgValue::Single(value.into()))
     }
 }
