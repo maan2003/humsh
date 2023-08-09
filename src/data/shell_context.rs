@@ -10,6 +10,7 @@ pub struct ShellContext {
     user_config: OnceCell<Option<Config>>,
     project_config: OnceCell<Option<Config>>,
     is_git: Cell<Option<bool>>,
+    is_cp: Cell<Option<bool>>,
 }
 
 impl ShellContext {
@@ -18,6 +19,7 @@ impl ShellContext {
             user_config: OnceCell::new(),
             project_config: OnceCell::new(),
             is_git: Cell::new(None),
+            is_cp: Cell::new(None),
         }
     }
 
@@ -36,6 +38,18 @@ impl ShellContext {
             .unwrap_or(false);
         self.is_git.set(Some(result));
         result
+    }
+
+    pub fn is_cp(&self) -> Result<bool> {
+        if let Some(result) = self.is_cp.get() {
+            return Ok(result);
+        }
+
+        let result = std::env::current_dir()?
+            .file_name()
+            .map_or(false, |vari| vari.to_str() == Some("cp"));
+        self.is_cp.set(Some(result));
+        Ok(result)
     }
 
     pub fn user_config(&self) -> Result<Option<&Config>> {

@@ -173,49 +173,55 @@ pub fn top() -> anyhow::Result<Program> {
 
 fn home_page() -> Result<Page, anyhow::Error> {
     let shell_context = ShellContext::new();
-    let mut page = page([group(
-        "Builtin commands",
-        [
-            button("c", "Change Directory", |mut ctx: Context| {
-                ctx.change_dir(select_directory()?)?;
-                ctx.replace_page(home_page()?);
-                Ok(())
-            }),
-            button("S", "Shell Command", |mut ctx: Context| {
-                // TODO: run shell commmand from history
-                let input = ctx.read_input()?;
-                ctx.leave_ui()?;
-                ctx.show_cmd()?;
-                ctx.hint_running_command(&input)?;
-                let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
-                ctx.run_command_in_foreground(&mut Command::new(shell).arg("-c").arg(input))?;
-                Ok(())
-            }),
-            button("s", "Shell", |mut ctx: Context| {
-                ctx.leave_ui()?;
-                let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
-                ctx.run_command_in_foreground(&mut Command::new(shell))?;
-                Ok(())
-            }),
-            button("g", "Git", |mut ctx: Context| {
-                ctx.push_page(git()?);
-                ctx.command_line_mut().add_arg(Arg::program("git"));
-                Ok(())
-            }),
-            button("e", "Edit", |mut ctx: Context| {
-                ctx.leave_ui()?;
-                // TODO: handle EDITOR
-                ctx.run_command_new_term(Command::new("hx").arg("."))?;
-                Ok(())
-            }),
-            button("C", "Competitive programming", |mut ctx: Context| {
+    let mut builtin_buttons = vec![
+        button("c", "Change Directory", |mut ctx: Context| {
+            ctx.change_dir(select_directory()?)?;
+            ctx.replace_page(home_page()?);
+            Ok(())
+        }),
+        // button("S", "Shell Command", |mut ctx: Context| {
+        //     // TODO: run shell commmand from history
+        //     let input = ctx.read_input()?;
+        //     ctx.leave_ui()?;
+        //     ctx.show_cmd()?;
+        //     ctx.hint_running_command(&input)?;
+        //     let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
+        //     ctx.run_command_in_foreground(&mut Command::new(shell).arg("-c").arg(input))?;
+        //     Ok(())
+        // }),
+        button("s", "Shell", |mut ctx: Context| {
+            ctx.leave_ui()?;
+            let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
+            ctx.run_command_in_foreground(&mut Command::new(shell))?;
+            Ok(())
+        }),
+    ];
+    if shell_context.is_git() {
+        builtin_buttons.push(button("g", "Git", |mut ctx: Context| {
+            ctx.push_page(git()?);
+            ctx.command_line_mut().add_arg(Arg::program("git"));
+            Ok(())
+        }));
+        builtin_buttons.push(button("e", "Edit", |mut ctx: Context| {
+            ctx.leave_ui()?;
+            // TODO: handle EDITOR
+            ctx.run_command_new_term(Command::new("hx").arg("."))?;
+            Ok(())
+        }));
+    }
+    if shell_context.is_cp()? {
+        builtin_buttons.push(button(
+            "C",
+            "Competitive programming",
+            |mut ctx: Context| {
                 let current_dir = std::env::current_dir()?;
                 let cp = cp::Cp::new(current_dir)?;
                 ctx.push_page(cp::cp_page(Arc::new(Mutex::new(cp)))?);
                 Ok(())
-            }),
-        ],
-    )]);
+            },
+        ));
+    }
+    let mut page = page([group("Builtin commands", builtin_buttons)]);
     if let Some(config) = shell_context.user_config()? {
         page.add_group(config.clone().into_group("User commands"));
     }
