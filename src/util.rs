@@ -10,8 +10,15 @@ pub trait CheckExitStatus {
 
 impl CheckExitStatus for std::process::Output {
     fn check_exit_status(self) -> anyhow::Result<Self> {
-        exit_status_to_error(self.status)?;
-        Ok(self)
+        if self.status.success() {
+            Ok(self)
+        } else {
+            bail!(
+                "exit code {}\nstderr: {}",
+                self.status.code().unwrap_or(-1),
+                std::str::from_utf8(&self.stderr).unwrap_or("*invalid utf8*")
+            );
+        }
     }
 }
 
