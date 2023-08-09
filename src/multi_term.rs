@@ -45,6 +45,10 @@ impl MultiTerm {
             if let Some(val) = value {
                 let key = key.to_str().context("must be valid utf8")?;
                 let val = val.to_str().context("must be valid utf8")?;
+                // HACK
+                if key == "DIRENV_DIFF" {
+                    continue;
+                }
                 cmd.arg(format!("-e{key}={val}"));
             }
         }
