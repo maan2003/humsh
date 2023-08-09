@@ -77,10 +77,8 @@ impl Page {
         self
     }
 
-    pub fn merge(mut self, other: Page) -> Page {
-        self.groups.extend(other.groups);
-        self.status = other.status.or(self.status);
-        self
+    pub fn add_group(&mut self, group: Group) {
+        self.groups.push(group);
     }
 }
 
@@ -173,7 +171,7 @@ pub fn top() -> anyhow::Result<Program> {
 }
 
 fn home_page() -> Result<Page, anyhow::Error> {
-    let builtin_page = page([group(
+    let mut page = page([group(
         "Builtin commands",
         [
             button("g", "Git", |mut ctx: Context| {
@@ -215,25 +213,25 @@ fn home_page() -> Result<Page, anyhow::Error> {
             }),
         ],
     )]);
-    let maybe_merge = |name: &str, path, page: Page| -> anyhow::Result<Page> {
+    let maybe_read = |name: &str, path| -> anyhow::Result<Option<Group>> {
         if Path::try_exists(path)? {
-            let new_page = Config::read(path)?.into_page(name);
-            Ok(page.merge(new_page))
+            let new_page = Config::read(path)?.into_group(name);
+            Ok(Some(new_page))
         } else {
-            Ok(page)
+            Ok(None)
         }
     };
-    Ok(maybe_merge(
-        "Project commands",
-        ".humsh/commands.toml".as_ref(),
-        maybe_merge(
-            "User commands",
-            &dirs::config_dir()
-                .context("config dir not found")?
-                .join("humsh/commands.toml"),
-            builtin_page,
-        )?,
-    )?)
+    let user_config = dirs::config_dir()
+        .context("config dir not found")?
+        .join("humsh/commands.toml");
+
+    if let Some(user) = maybe_read("User commands", &user_config)? {
+        page.add_group(user);
+    }
+    if let Some(project) = maybe_read("Project commands", ".humsh/commands.toml".as_ref())? {
+        page.add_group(project);
+    }
+    Ok(page)
 }
 
 fn git_status() -> anyhow::Result<String> {
