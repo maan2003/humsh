@@ -402,6 +402,9 @@ impl Ui {
         terminal::disable_raw_mode()?;
         let mut buf = String::new();
         std::io::stdin().read_line(&mut buf)?;
+        if buf.as_bytes().last() == Some(&b'\n') {
+            buf.truncate(buf.len() - 1);
+        }
         terminal::enable_raw_mode()?;
         Ok(buf)
     }
