@@ -1,6 +1,6 @@
 mod cp;
+mod shell_context;
 
-use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
 use std::{process::Stdio, sync::Arc};
@@ -8,8 +8,9 @@ use std::{process::Stdio, sync::Arc};
 use anyhow::Context as _;
 
 use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
-use crate::config::Config;
 use crate::ui::Context;
+
+use self::shell_context::ShellContext;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keybind(pub String);
@@ -171,26 +172,17 @@ pub fn top() -> anyhow::Result<Program> {
 }
 
 fn home_page() -> Result<Page, anyhow::Error> {
+    let shell_context = ShellContext::new();
     let mut page = page([group(
         "Builtin commands",
         [
-            button("g", "Git", |mut ctx: Context| {
-                ctx.push_page(git()?);
-                ctx.command_line_mut().add_arg(Arg::program("git"));
-                Ok(())
-            }),
-            button("e", "Edit", |mut ctx: Context| {
-                ctx.leave_ui()?;
-                // TODO: handle EDITOR
-                ctx.run_command_new_term(Command::new("hx").arg("."))?;
-                Ok(())
-            }),
             button("c", "Change Directory", |mut ctx: Context| {
                 ctx.change_dir(select_directory()?)?;
                 ctx.replace_page(home_page()?);
                 Ok(())
             }),
             button("S", "Shell Command", |mut ctx: Context| {
+                // TODO: run shell commmand from history
                 let input = ctx.read_input()?;
                 ctx.leave_ui()?;
                 ctx.show_cmd()?;
@@ -205,6 +197,17 @@ fn home_page() -> Result<Page, anyhow::Error> {
                 ctx.run_command_in_foreground(&mut Command::new(shell))?;
                 Ok(())
             }),
+            button("g", "Git", |mut ctx: Context| {
+                ctx.push_page(git()?);
+                ctx.command_line_mut().add_arg(Arg::program("git"));
+                Ok(())
+            }),
+            button("e", "Edit", |mut ctx: Context| {
+                ctx.leave_ui()?;
+                // TODO: handle EDITOR
+                ctx.run_command_new_term(Command::new("hx").arg("."))?;
+                Ok(())
+            }),
             button("C", "Competitive programming", |mut ctx: Context| {
                 let current_dir = std::env::current_dir()?;
                 let cp = cp::Cp::new(current_dir)?;
@@ -213,23 +216,12 @@ fn home_page() -> Result<Page, anyhow::Error> {
             }),
         ],
     )]);
-    let maybe_read = |name: &str, path| -> anyhow::Result<Option<Group>> {
-        if Path::try_exists(path)? {
-            let new_page = Config::read(path)?.into_group(name);
-            Ok(Some(new_page))
-        } else {
-            Ok(None)
-        }
-    };
-    let user_config = dirs::config_dir()
-        .context("config dir not found")?
-        .join("humsh/commands.toml");
-
-    if let Some(user) = maybe_read("User commands", &user_config)? {
-        page.add_group(user);
+    if let Some(config) = shell_context.user_config()? {
+        page.add_group(config.clone().into_group("User commands"));
     }
-    if let Some(project) = maybe_read("Project commands", ".humsh/commands.toml".as_ref())? {
-        page.add_group(project);
+
+    if let Some(config) = shell_context.project_config()? {
+        page.add_group(config.clone().into_group("Project commands"));
     }
     Ok(page)
 }
