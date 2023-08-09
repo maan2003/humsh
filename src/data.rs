@@ -209,7 +209,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
             Ok(())
         }));
     }
-    if shell_context.is_cp()? {
+    if shell_context.is_cp() {
         builtin_buttons.push(button(
             "C",
             "Competitive programming",
@@ -222,12 +222,12 @@ fn home_page() -> Result<Page, anyhow::Error> {
         ));
     }
     let mut page = page([group("Builtin commands", builtin_buttons)]);
-    if let Some(config) = shell_context.user_config()? {
-        page.add_group(config.clone().into_group("User commands"));
+    if let Some(config) = shell_context.user_config() {
+        page.add_group(group("User commands", config.command_buttons()));
     }
 
-    if let Some(config) = shell_context.project_config()? {
-        page.add_group(config.clone().into_group("Project commands"));
+    if let Some(config) = shell_context.project_config() {
+        page.add_group(group("Project commands", config.command_buttons()));
     }
     Ok(page)
 }

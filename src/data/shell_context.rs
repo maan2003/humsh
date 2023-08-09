@@ -1,5 +1,5 @@
 use crate::config::Config;
-use anyhow::{Context, Result};
+use anyhow::Context as _;
 use dirs;
 use once_cell::unsync::OnceCell;
 use std::cell::Cell;
@@ -28,59 +28,66 @@ impl ShellContext {
             return result;
         }
 
-        let result = Command::new("git")
-            .arg("rev-parse")
-            .arg("--is-inside-work-tree")
-            .output()
-            .ok()
-            .filter(|output| output.status.success())
-            .map(|output| output.stdout.starts_with(b"true"))
-            .unwrap_or(false);
+        let result = self
+            .project_config()
+            .and_then(|x| x.git)
+            .or_else(|| self.user_config().and_then(|x| x.git))
+            .unwrap_or_else(detect_git);
+
         self.is_git.set(Some(result));
         result
     }
 
-    pub fn is_cp(&self) -> Result<bool> {
+    pub fn is_cp(&self) -> bool {
         if let Some(result) = self.is_cp.get() {
-            return Ok(result);
+            return result;
         }
 
-        let result = std::env::current_dir()?
-            .file_name()
-            .map_or(false, |vari| vari.to_str() == Some("cp"));
+        let result = self
+            .project_config()
+            .and_then(|x| x.cp)
+            .or_else(|| self.user_config().and_then(|x| x.cp))
+            .unwrap_or(false);
+
         self.is_cp.set(Some(result));
-        Ok(result)
+        result
     }
 
-    pub fn user_config(&self) -> Result<Option<&Config>> {
+    pub fn user_config(&self) -> Option<&Config> {
         self.user_config
-            .get_or_try_init(|| {
+            .get_or_init(|| {
                 let path = dirs::config_dir()
-                    .context("config dir not found")?
-                    .join("humsh/commands.toml");
+                    .context("config dir not found")
+                    .ok()?
+                    .join("humsh/config.toml");
                 if !path.exists() {
-                    return Ok(None);
+                    return None;
                 }
-                Config::read(&path)
-                    .with_context(|| format!("Failed to read user config from {}", path.display()))
-                    .map(Some)
+                Config::read(&path).ok()
             })
-            .map(Option::as_ref)
+            .as_ref()
     }
 
-    pub fn project_config(&self) -> Result<Option<&Config>> {
+    pub fn project_config(&self) -> Option<&Config> {
         self.project_config
-            .get_or_try_init(|| {
-                let path = Path::new(".humsh/commands.toml");
+            .get_or_init(|| {
+                let path = Path::new(".humsh/config.toml");
                 if !path.exists() {
-                    return Ok(None);
+                    return None;
                 }
-                Config::read(&path)
-                    .with_context(|| {
-                        format!("Failed to read project config from {}", path.display())
-                    })
-                    .map(Some)
+                Config::read(&path).ok()
             })
-            .map(Option::as_ref)
+            .as_ref()
     }
+}
+
+fn detect_git() -> bool {
+    Command::new("git")
+        .arg("rev-parse")
+        .arg("--is-inside-work-tree")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| output.stdout.starts_with(b"true"))
+        .unwrap_or(false)
 }
