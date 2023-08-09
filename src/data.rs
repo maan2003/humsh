@@ -275,10 +275,7 @@ pub fn git() -> anyhow::Result<Page> {
                         .context("branch should be remote branch")?;
                     let arg = Arg::new(
                         ArgOrder::POSITIONAL,
-                        ArgValue::Multi(vec![
-                            ArgValue::Simple(remote.to_string()),
-                            ArgValue::Simple(format!("HEAD:{branch}")),
-                        ]),
+                        ArgValue::Multi(vec![remote.to_string(), format!("HEAD:{branch}")]),
                     );
                     ctx.command_line_mut().add_arg(arg);
                     ctx.run_command_line()?;

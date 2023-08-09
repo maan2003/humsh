@@ -9,7 +9,7 @@ pub struct CommandLine {
 pub enum ArgValue {
     Simple(String),
     Valued(String, String),
-    Multi(Vec<ArgValue>),
+    Multi(Vec<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -42,7 +42,7 @@ impl ArgValue {
             }
             ArgValue::Multi(m) => {
                 for a in m {
-                    a.add_to(args);
+                    args.push(a.clone());
                 }
             }
         }
