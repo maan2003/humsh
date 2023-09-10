@@ -92,7 +92,7 @@ impl MultiTerm {
 }
 
 pub fn detect() -> Option<MultiTerm> {
-    if env::var("TMUX").is_ok_and(|x| !x.is_empty()) {
+    if env::var("TMUX").is_ok() {
         return Some(MultiTerm {
             kind: TermDetect::Tmux,
         });
