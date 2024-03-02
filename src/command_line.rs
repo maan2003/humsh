@@ -110,6 +110,17 @@ impl Arg {
         Arg::new(ArgOrder::SUBCOMMAND, ArgValue::Single(value.into()))
     }
 
+    pub fn subcommands<I>(values: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        Arg::new(
+            ArgOrder::SUBCOMMAND,
+            ArgValue::Multi(values.into_iter().map(|x| x.into()).collect()),
+        )
+    }
+
     pub fn positional(value: impl Into<String>) -> Self {
         Arg::new(ArgOrder::POSITIONAL, ArgValue::Single(value.into()))
     }

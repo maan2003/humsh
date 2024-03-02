@@ -132,23 +132,27 @@ impl Ui {
         Ok(())
     }
 
-    fn run_command_line(&mut self, stdout: Stdout) -> anyhow::Result<()> {
+    fn run_command_line_other(&mut self, cmd: &CommandLine, stdout: Stdout) -> anyhow::Result<()> {
         self.leave_ui(stdout)?;
-        let cli = self
-            .command_line()
+        let cli = cmd
             .args
             .iter()
             .map(|x| x.value.to_string())
             .collect::<Vec<_>>()
             .join(" ");
         self.hint_running_command(&cli, stdout)?;
-        let mut cmd = self.command_line().to_std();
+        let mut cmd = cmd.to_std();
         self.direnv.hook(&mut cmd)?;
         let status = cmd.spawn()?.wait()?;
         if !status.success() {
             bail!("exit code {}", status.code().unwrap_or(-1));
         }
         Ok(())
+    }
+
+    fn run_command_line(&mut self, stdout: Stdout) -> anyhow::Result<()> {
+        let cmd = self.command_line().clone();
+        self.run_command_line_other(&cmd, stdout)
     }
 
     fn hint_running_command(&self, cmd: &str, stdout: Stdout) -> crossterm::Result<()> {
@@ -392,12 +396,12 @@ impl Ui {
         Ok(())
     }
 
-    pub fn read_input(&self, stdout: Stdout) -> anyhow::Result<String> {
+    pub fn read_input(&self, stdout: Stdout, prompt: &str) -> anyhow::Result<String> {
         execute!(
             stdout,
             cursor::MoveToColumn(0),
             terminal::Clear(terminal::ClearType::CurrentLine),
-            Print("> ")
+            Print(format!("{prompt}= "))
         )?;
         terminal::disable_raw_mode()?;
         let mut buf = String::new();

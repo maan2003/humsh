@@ -123,6 +123,10 @@ impl<'a, 'b> Context<'a, 'b> {
         Ok(())
     }
 
+    pub fn run_command_line_other(&mut self, cmd: &CommandLine) -> anyhow::Result<()> {
+        self.ui.run_command_line_other(cmd, self.stdout)
+    }
+
     pub fn run_command_line(&mut self) -> anyhow::Result<()> {
         self.ui.run_command_line(self.stdout)
     }
@@ -159,7 +163,7 @@ impl<'a, 'b> Context<'a, 'b> {
         Ok(command.spawn()?)
     }
 
-    pub fn read_input(&mut self) -> anyhow::Result<String> {
-        self.ui.read_input(self.stdout)
+    pub fn read_input(&mut self, prompt: &str) -> anyhow::Result<String> {
+        self.ui.read_input(self.stdout, prompt)
     }
 }

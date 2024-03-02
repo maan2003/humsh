@@ -240,6 +240,60 @@ fn jj_status() -> anyhow::Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PageAction {
+    Pop,
+    None,
+}
+
+pub fn exec_cmd(ctx: &mut Context, args: Vec<Arg>) -> anyhow::Result<()> {
+    let mut cmd = ctx.command_line().clone();
+    for arg in &args {
+        cmd.add_arg(arg.clone());
+    }
+    ctx.run_command_line_other(&cmd)?;
+    Ok(())
+}
+
+pub fn prompt_arg(ctx: &mut Context, arg_name: &str) -> anyhow::Result<()> {
+    let input = ctx.read_input(arg_name)?;
+    ctx.command_line_mut()
+        .add_arg(Arg::switch(format!("--{arg_name}={input}")));
+    Ok(())
+}
+
+pub fn subcommand_button<I>(key: &'static str, description: &str, page: Page, args: I) -> Button
+where
+    I: IntoIterator,
+    I::Item: Into<String>,
+{
+    let arg = Arg::subcommands(args);
+    button(key, description, move |mut ctx: Context| {
+        ctx.push_page(page.clone());
+        ctx.command_line_mut().add_arg(arg.clone());
+        Ok(())
+    })
+}
+
+pub fn exec_button(
+    key: &'static str,
+    description: &str,
+    args: impl IntoIterator<Item = Arg>,
+    page_action: PageAction,
+) -> Button {
+    let args: Vec<_> = args.into_iter().collect();
+    button(key, description, move |mut ctx: Context| {
+        let result = exec_cmd(&mut ctx, args.clone());
+        match page_action {
+            PageAction::Pop => {
+                ctx.pop_page();
+            }
+            PageAction::None => {}
+        }
+        result
+    })
+}
+
 pub fn git() -> anyhow::Result<Page> {
     let push = page([
         group(
@@ -252,140 +306,31 @@ pub fn git() -> anyhow::Result<Page> {
         group(
             "Push",
             [
-                button("p", "push", |mut ctx: Context| {
-                    ctx.run_command_line()?;
-                    ctx.show_cmd()?;
-                    ctx.enter_ui()?;
+                exec_button("p", "Push", [], PageAction::Pop),
+                button("c", "change", |mut ctx: Context| {
+                    prompt_arg(&mut ctx, "change")?;
+                    exec_cmd(&mut ctx, vec![])?;
                     ctx.pop_page();
                     Ok(())
                 }),
-                button("c", "change", |mut ctx: Context| {
-                    let input = ctx.read_input()?;
-                    ctx.command_line_mut()
-                        .add_arg(Arg::switch(format!("--change={input}")));
-                    ctx.run_command_line()?;
-                    ctx.show_cmd()?;
-                    Ok(())
-                }),
             ],
         ),
     ]);
-
-    let run_with_args = |args: Vec<Arg>| {
-        move |mut ctx: Context| {
-            for arg in &args {
-                ctx.command_line_mut().add_arg(arg.clone());
-            }
-            ctx.run_command_line()?;
-            Ok(())
-        }
-    };
-    let commit = page([
-        group(
-            "Arguments",
-            [
-                flag_button("-a", "Stage all modified and deleted files", "--all"),
-                flag_button("-e", "Allow empty commit", "--allow-empty"),
-                flag_button("-v", "Show diff of changes to be committed", "--verbose"),
-                flag_button("-n", "Disable hooks", "--no-verify"),
-                flag_button(
-                    "-R",
-                    "Claim authorship and reset author date",
-                    "--reset-author",
-                ),
-                // flag_button("-A", "Override the author", "--author"),
-                flag_button("-s", "Add Signed-off-by line", "--signoff"),
-                // flag_button("-C", "Reuse commit message", "--reuse-message"),
-            ],
-        ),
-        group(
-            "Actions",
-            [
-                button("c", "Commit", run_with_args(vec![])),
-                button(
-                    "e",
-                    "Extend",
-                    run_with_args(vec![Arg::switch("--no-edit"), Arg::switch("--amend")]),
-                ),
-                button(
-                    "w",
-                    "Reword",
-                    run_with_args(vec![
-                        Arg::switch("--amend"),
-                        Arg::switch("--only"),
-                        Arg::switch("--allow-empty"),
-                    ]),
-                ),
-                button("a", "Amend", run_with_args(vec![Arg::switch("--amend")])),
-                button("f", "Fixup", run_with_args(vec![])),
-                button("F", "Instant Fixup", run_with_args(vec![])),
-            ],
-        ),
-    ]);
-
-    let fetch = page([group(
-        "Fetch from",
-        [
-            button(
-                "p",
-                "origin",
-                run_with_args(vec![Arg::positional("origin")]),
-            ),
-            button(
-                "u",
-                "upstream",
-                run_with_args(vec![Arg::positional("upstream")]),
-            ),
-            button("f", "all", run_with_args(vec![Arg::switch("--all")])),
-        ],
-    )]);
 
     let page = page([group(
         "Commands",
         [
-            // button("c", "Commit", move |mut ctx: Context| {
-            //     ctx.push_page(commit.clone());
-            //     ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
-            //     // TODO: enable this later
-            //     // ctx.command_line_mut().add_arg(Arg::switch("--verbose"));
-            //     Ok(())
-            // }),
-            button("p", "Push", move |mut ctx: Context| {
-                ctx.push_page(push.clone());
-                ctx.command_line_mut().add_arg(Arg::new(
-                    ArgOrder::SUBCOMMAND,
-                    ArgValue::Multi(vec!["git".to_string(), "push".to_string()]),
-                ));
-                Ok(())
-            }),
-            button("f", "Fetch", move |mut ctx: Context| {
-                ctx.push_page(fetch.clone());
-                ctx.command_line_mut().add_arg(Arg::new(
-                    ArgOrder::SUBCOMMAND,
-                    ArgValue::Multi(vec!["git".to_string(), "fetch".to_string()]),
-                ));
-                ctx.run_command_line()?;
-                ctx.show_cmd()?;
-                ctx.pop_page();
-                Ok(())
-            }),
-            button("d", "Diff", |mut ctx: Context| {
-                ctx.run_command_in_foreground(Command::new("jj").arg("diff"))?;
-                Ok(())
-            }),
-            button("D", "Describe", |mut ctx: Context| {
-                ctx.run_command_in_foreground(Command::new("jj").arg("desc"))?;
-                Ok(())
-            }),
-            button("l", "Log", |mut ctx: Context| {
-                ctx.run_command_in_foreground(Command::new("jj").arg("log"))?;
-                ctx.show_cmd()?;
-                Ok(())
-            }),
-            button("n", "New", |mut ctx: Context| {
-                ctx.run_command_in_foreground(Command::new("jj").arg("new"))?;
-                Ok(())
-            }),
+            subcommand_button("p", "Push", push, ["git", "push"]),
+            exec_button(
+                "f",
+                "Fetch",
+                [Arg::subcommands(["git", "fetch"])],
+                PageAction::None,
+            ),
+            exec_button("d", "Diff", [Arg::subcommand("diff")], PageAction::None),
+            exec_button("D", "Describe", [Arg::subcommand("desc")], PageAction::None),
+            exec_button("l", "Log", [Arg::subcommand("log")], PageAction::None),
+            exec_button("n", "New", [Arg::subcommand("new")], PageAction::None),
             button("s", "Refresh status", |mut ctx: Context| {
                 ctx.currrent_page_mut().status = Some(jj_status()?);
                 Ok(())
