@@ -173,7 +173,7 @@ pub fn group(description: impl Into<String>, buttons: impl Into<Vec<Button>>) ->
 pub fn button(
     key: impl Into<String>,
     description: impl Into<String>,
-    handler: impl ButtonHandler + 'static,
+    handler: impl Fn(Context) -> anyhow::Result<()> + 'static,
 ) -> Button {
     Button {
         key: Keybind(key.into()),
@@ -183,7 +183,11 @@ pub fn button(
 }
 
 pub fn flag_button(key: &'static str, description: &str, flag: &'static str) -> Button {
-    button(key, description, ToggleFlag(Cow::Borrowed(flag)))
+    Button {
+        key: Keybind(key.into()),
+        description: description.into(),
+        handler: Arc::new(ToggleFlag(Cow::Borrowed(flag))),
+    }
 }
 
 pub fn top() -> anyhow::Result<Program> {
@@ -197,12 +201,12 @@ pub fn top() -> anyhow::Result<Program> {
 fn home_page() -> Result<Page, anyhow::Error> {
     let shell_context = ShellContext::new();
     let mut builtin_buttons = vec![
-        button("c", "Change Directory", |mut ctx: Context| {
+        button("c", "Change Directory", |mut ctx| {
             ctx.change_dir(select_directory()?)?;
             ctx.replace_page(home_page()?);
             Ok(())
         }),
-        // button("S", "Shell Command", |mut ctx: Context| {
+        // button("S", "Shell Command", |mut ctx| {
         //     // TODO: run shell commmand from history
         //     let input = ctx.read_input()?;
         //     ctx.leave_ui()?;
@@ -212,7 +216,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
         //     ctx.run_command_in_foreground(&mut Command::new(shell).arg("-c").arg(input))?;
         //     Ok(())
         // }),
-        button("s", "Shell", |mut ctx: Context| {
+        button("s", "Shell", |mut ctx| {
             ctx.leave_ui()?;
             let shell = std::env::var("SHELL").unwrap_or("bash".to_owned());
             ctx.run_command_in_foreground(&mut Command::new(shell))?;
@@ -220,12 +224,12 @@ fn home_page() -> Result<Page, anyhow::Error> {
         }),
     ];
     if shell_context.is_git() {
-        builtin_buttons.push(button("j", "Jujutsu", |mut ctx: Context| {
+        builtin_buttons.push(button("j", "Jujutsu", |mut ctx| {
             ctx.push_page(jj::jj()?);
             ctx.command_line_mut().add_arg(Arg::program("jj"));
             Ok(())
         }));
-        builtin_buttons.push(button("e", "Edit", |mut ctx: Context| {
+        builtin_buttons.push(button("e", "Edit", |mut ctx| {
             ctx.leave_ui()?;
             // TODO: handle EDITOR
             ctx.run_command_new_term(Command::new("hx").arg("."))?;
@@ -271,7 +275,7 @@ where
     I::Item: Into<String>,
 {
     let arg = Arg::subcommands(args);
-    button(key, description, move |mut ctx: Context| {
+    button(key, description, move |mut ctx| {
         ctx.push_page(page.clone());
         ctx.command_line_mut().add_arg(arg.clone());
         Ok(())
@@ -285,7 +289,7 @@ pub fn exec_button(
     page_action: PageAction,
 ) -> Button {
     let args: Vec<_> = args.into_iter().collect();
-    button(key, description, move |mut ctx: Context| {
+    button(key, description, move |mut ctx| {
         let result = exec_cmd(&mut ctx, args.clone());
         match page_action {
             PageAction::Pop => {
@@ -305,7 +309,7 @@ pub fn exec_button_arg_prompt(
     arg_prompt: &'static str,
 ) -> Button {
     let args: Vec<_> = args.into_iter().collect();
-    button(key, description, move |mut ctx: Context| {
+    button(key, description, move |mut ctx| {
         let result = prompt_arg(&mut ctx, arg_prompt);
         let result = result.and_then(|_| exec_cmd(&mut ctx, args.clone()));
         match page_action {

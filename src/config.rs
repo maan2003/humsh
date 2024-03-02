@@ -30,7 +30,7 @@ impl Config {
             .clone()
             .into_iter()
             .map(|x| {
-                data::button(&x.key, x.desc, move |mut ctx: Context| {
+                data::button(&x.key, x.desc, move |mut ctx| {
                     let mut command = std::process::Command::new("bash");
                     command.arg("-c").arg(&x.command);
                     if x.term {

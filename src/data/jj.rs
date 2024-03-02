@@ -45,7 +45,7 @@ pub fn jj() -> anyhow::Result<Page> {
                 [exec_button("n", "New", [], PageAction::Pop)],
             ),
             exec_button("S", "Squash", [Arg::subcommand("squash")], PageAction::None),
-            button("s", "Refresh status", |mut ctx: Context| {
+            button("s", "Refresh status", |mut ctx| {
                 ctx.currrent_page_mut().refresh_status()
             }),
         ],

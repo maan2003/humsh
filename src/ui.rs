@@ -10,7 +10,7 @@ use tokio::runtime;
 use tokio_stream::StreamExt;
 
 use crate::command_line::CommandLine;
-use crate::data::{self, Button, ButtonHandler, ButtonValue, Group, Page, ToggleFlag};
+use crate::data::{self, Button, ButtonHandler, ButtonValue, Group, Page};
 use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
 pub use context::{Context, ExternalContext, StatusId};
