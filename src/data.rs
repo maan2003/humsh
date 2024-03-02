@@ -2,9 +2,12 @@ mod shell_context;
 
 use std::borrow::Cow;
 use std::process::Command;
+
 use std::{process::Stdio, sync::Arc};
 
-use crate::command_line::{Arg, CommandLine};
+use anyhow::Result;
+
+use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
 use crate::ui::Context;
 
 use self::shell_context::ShellContext;
@@ -51,7 +54,7 @@ pub enum ButtonValue<'a> {
 
 pub trait ButtonHandler {
     fn run(&self, ctx: Context<'_, '_>) -> anyhow::Result<()>;
-    fn value(&self, command_line: &CommandLine) -> Option<ButtonValue<'_>> {
+    fn value<'a>(&'a self, command_line: &'a CommandLine) -> Option<ButtonValue<'a>> {
         let _ = command_line;
         None
     }
@@ -155,6 +158,64 @@ impl ButtonHandler for ToggleFlag {
     }
 }
 
+pub struct PromptButton {
+    f: Box<dyn Fn(&mut Context<'_, '_>) -> anyhow::Result<String>>,
+    arg: String,
+}
+
+impl ButtonHandler for PromptButton {
+    fn run(&self, mut ctx: Context<'_, '_>) -> anyhow::Result<()> {
+        let cmd_line = ctx.command_line();
+        if self.get_value(cmd_line).is_some() {
+            self.unset_value(ctx.command_line_mut());
+        } else {
+            let value = (self.f)(&mut ctx)?;
+            self.set_value(ctx.command_line_mut(), value);
+        }
+
+        Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self as _
+    }
+
+    fn value<'a>(&'a self, command_line: &'a CommandLine) -> Option<ButtonValue<'a>> {
+        Some(ButtonValue::String {
+            name: &self.arg,
+            value: self.get_value(command_line),
+        })
+    }
+}
+
+impl PromptButton {
+    fn get_value<'a>(&self, cmd_line: &'a CommandLine) -> Option<&'a str> {
+        cmd_line.args.iter().find_map(|arg| match &arg.value {
+            ArgValue::Multi(m) if m.first()? == &self.arg => m.get(1).map(|x| x.as_str()),
+            _ => None,
+        })
+    }
+    fn set_value(&self, cmd_line: &mut CommandLine, value: String) {
+        cmd_line.add_arg(Arg::new(
+            ArgOrder::FLAG,
+            ArgValue::Multi(vec![self.arg.clone(), value]),
+        ));
+    }
+    fn unset_value(&self, cmd_line: &mut CommandLine) {
+        let arg = cmd_line
+            .args
+            .iter()
+            .find_map(|arg| match &arg.value {
+                ArgValue::Multi(m) if m.first()? == &self.arg => Some(arg),
+                _ => None,
+            })
+            .cloned();
+        if let Some(arg) = arg {
+            cmd_line.args.remove(&arg);
+        }
+    }
+}
+
 pub fn page(groups: impl Into<Vec<Group>>) -> Page {
     Page {
         status: None,
@@ -179,6 +240,22 @@ pub fn button(
         key: Keybind(key.into()),
         description: description.into(),
         handler: Arc::new(handler),
+    }
+}
+
+pub fn prompt_button(
+    key: impl Into<String>,
+    description: impl Into<String>,
+    name: &str,
+    handler: impl Fn(&mut Context) -> anyhow::Result<String> + 'static,
+) -> Button {
+    Button {
+        key: Keybind(key.into()),
+        description: description.into(),
+        handler: Arc::new(PromptButton {
+            f: Box::new(handler),
+            arg: name.to_string(),
+        }),
     }
 }
 
@@ -262,8 +339,12 @@ pub fn exec_cmd(ctx: &mut Context, args: Vec<Arg>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn prompt_arg(ctx: &mut Context, arg_name: &str) -> anyhow::Result<()> {
-    let input = ctx.read_input(arg_name)?;
+pub fn prompt_arg(
+    ctx: &mut Context,
+    arg_name: &str,
+    prompt_fn: impl Fn(&mut Context) -> Result<String>,
+) -> anyhow::Result<()> {
+    let input = prompt_fn(ctx)?;
     ctx.command_line_mut()
         .add_arg(Arg::switch(format!("--{arg_name}={input}")));
     Ok(())
@@ -307,10 +388,11 @@ pub fn exec_button_arg_prompt(
     args: impl IntoIterator<Item = Arg>,
     page_action: PageAction,
     arg_prompt: &'static str,
+    prompt_fn: impl Fn(&mut Context) -> Result<String> + 'static,
 ) -> Button {
     let args: Vec<_> = args.into_iter().collect();
     button(key, description, move |mut ctx| {
-        let result = prompt_arg(&mut ctx, arg_prompt);
+        let result = prompt_arg(&mut ctx, arg_prompt, &prompt_fn);
         let result = result.and_then(|_| exec_cmd(&mut ctx, args.clone()));
         match page_action {
             PageAction::Pop => {

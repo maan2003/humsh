@@ -1,3 +1,5 @@
+use anyhow::Context as _;
+
 use super::*;
 
 fn jj_status() -> anyhow::Result<String> {
@@ -6,6 +8,21 @@ fn jj_status() -> anyhow::Result<String> {
         .arg("--color=always")
         .output()?;
     Ok(String::from_utf8(output.stdout)?)
+}
+
+fn jj_select_rev(ctx: &mut Context) -> anyhow::Result<String> {
+    ctx.leave_ui()?;
+    let output = std::process::Command::new("bash")
+        .arg("-c")
+        .arg(format!(
+            "jj log -r '::' --no-graph --color=always | fzf --ansi"
+        ))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .output()?;
+    let mut output_text = String::from_utf8(output.stdout)?;
+    output_text.truncate(output_text.find(' ').context("invalid output")?);
+    Ok(output_text)
 }
 
 pub fn jj() -> anyhow::Result<Page> {
@@ -19,10 +36,18 @@ pub fn jj() -> anyhow::Result<Page> {
                 [
                     flag_button("d", "Deleted", "--deleted"),
                     flag_button("n", "Dry run", "--dry-run"),
+                    prompt_button("r", "Revision", "--revision", jj_select_rev),
                 ],
                 [
                     exec_button("p", "Push", [], PageAction::Pop),
-                    exec_button_arg_prompt("c", "Change", [], PageAction::Pop, "change"),
+                    exec_button_arg_prompt(
+                        "c",
+                        "Change",
+                        [],
+                        PageAction::Pop,
+                        "change",
+                        jj_select_rev,
+                    ),
                 ],
             ),
             exec_button(
