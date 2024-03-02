@@ -262,7 +262,7 @@ pub fn prompt_arg(ctx: &mut Context, arg_name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn subcommand_button<I>(key: &'static str, description: &str, page: Page, args: I) -> Button
+pub fn subcommand_button<I>(key: &'static str, description: &str, args: I, page: Page) -> Button
 where
     I: IntoIterator,
     I::Item: Into<String>,
@@ -294,33 +294,50 @@ pub fn exec_button(
     })
 }
 
-pub fn git() -> anyhow::Result<Page> {
-    let push = page([
-        group(
-            "Arguments",
-            [
-                flag_button("-d", "Deleted", "--deleted"),
-                flag_button("-n", "Dry run", "--dry-run"),
-            ],
-        ),
-        group(
-            "Push",
-            [
-                exec_button("p", "Push", [], PageAction::Pop),
-                button("c", "change", |mut ctx: Context| {
-                    prompt_arg(&mut ctx, "change")?;
-                    exec_cmd(&mut ctx, vec![])?;
-                    ctx.pop_page();
-                    Ok(())
-                }),
-            ],
-        ),
-    ]);
+pub fn args_page(
+    name: &str,
+    args: impl Into<Vec<Button>>,
+    actions: impl Into<Vec<Button>>,
+) -> Page {
+    page([group("Arguments", args.into()), group(name, actions.into())])
+}
 
+pub fn subcommand_page_button<I>(
+    key: &'static str,
+    name: &str,
+    cmd_args: I,
+    args: impl Into<Vec<Button>>,
+    actions: impl Into<Vec<Button>>,
+) -> Button
+where
+    I: IntoIterator,
+    I::Item: Into<String>,
+{
+    subcommand_button(key, name, cmd_args, args_page(name, args, actions))
+}
+
+pub fn git() -> anyhow::Result<Page> {
     let page = page([group(
         "Commands",
         [
-            subcommand_button("p", "Push", push, ["git", "push"]),
+            subcommand_page_button(
+                "p",
+                "Push",
+                ["git", "push"],
+                [
+                    flag_button("-d", "Deleted", "--deleted"),
+                    flag_button("-n", "Dry run", "--dry-run"),
+                ],
+                [
+                    exec_button("p", "Push", [], PageAction::Pop),
+                    button("c", "change", |mut ctx: Context| {
+                        prompt_arg(&mut ctx, "change")?;
+                        exec_cmd(&mut ctx, vec![])?;
+                        ctx.pop_page();
+                        Ok(())
+                    }),
+                ],
+            ),
             exec_button(
                 "f",
                 "Fetch",
@@ -331,6 +348,7 @@ pub fn git() -> anyhow::Result<Page> {
             exec_button("D", "Describe", [Arg::subcommand("desc")], PageAction::None),
             exec_button("l", "Log", [Arg::subcommand("log")], PageAction::None),
             exec_button("n", "New", [Arg::subcommand("new")], PageAction::None),
+            exec_button("S", "Squash", [Arg::subcommand("squash")], PageAction::None),
             button("s", "Refresh status", |mut ctx: Context| {
                 ctx.currrent_page_mut().status = Some(jj_status()?);
                 Ok(())
