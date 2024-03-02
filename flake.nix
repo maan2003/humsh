@@ -1,7 +1,7 @@
 {
   outputs = { nixpkgs, self } @ inputs:
   let
-    system = "x86_64-linux";
+    system = "aarch64-linux";
     overlay = self: super: {
       humsh = self.rustPlatform.buildRustPackage {
         pname = "humsh";

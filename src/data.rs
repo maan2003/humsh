@@ -197,9 +197,9 @@ fn home_page() -> Result<Page, anyhow::Error> {
         }),
     ];
     if shell_context.is_git() {
-        builtin_buttons.push(button("g", "Git", |mut ctx: Context| {
+        builtin_buttons.push(button("j", "Jujutsu", |mut ctx: Context| {
             ctx.push_page(git()?);
-            ctx.command_line_mut().add_arg(Arg::program("git"));
+            ctx.command_line_mut().add_arg(Arg::program("jj"));
             Ok(())
         }));
         builtin_buttons.push(button("e", "Edit", |mut ctx: Context| {
@@ -232,15 +232,10 @@ fn home_page() -> Result<Page, anyhow::Error> {
     Ok(page)
 }
 
-fn git_status() -> anyhow::Result<String> {
-    let output = Command::new("git")
-        .arg("-c")
-        .arg("color.status=always")
-        .arg("-c")
-        .arg("advice.statusHints=false")
+fn jj_status() -> anyhow::Result<String> {
+    let output = Command::new("jj")
         .arg("status")
-        .arg("--branch")
-        .arg("--show-stash")
+        .arg("--color=always")
         .output()?;
     Ok(String::from_utf8(output.stdout)?)
 }
@@ -250,31 +245,26 @@ pub fn git() -> anyhow::Result<Page> {
         group(
             "Arguments",
             [
-                flag_button("-f", "Force with lease", "--force-with-lease"),
-                flag_button("-F", "Force", "--force"),
-                flag_button("-h", "Disable hooks", "--no-verify"),
+                flag_button("-d", "Deleted", "--deleted"),
                 flag_button("-n", "Dry run", "--dry-run"),
             ],
         ),
         group(
-            "Push to",
+            "Push",
             [
-                button("p", "origin/master", |mut ctx: Context| {
-                    ctx.run_command_line()
-                }),
-                // TODO
-                // button("u", "upstream", |mut ctx: Context| ctx.run_command_line()),
-                button("e", "elsewhere", |mut ctx: Context| {
-                    let branch = select_branch("--remote")?;
-                    let (remote, branch) = branch
-                        .split_once('/')
-                        .context("branch should be remote branch")?;
-                    let arg = Arg::new(
-                        ArgOrder::POSITIONAL,
-                        ArgValue::Multi(vec![remote.to_string(), format!("HEAD:{branch}")]),
-                    );
-                    ctx.command_line_mut().add_arg(arg);
+                button("p", "push", |mut ctx: Context| {
                     ctx.run_command_line()?;
+                    ctx.show_cmd()?;
+                    ctx.enter_ui()?;
+                    ctx.pop_page();
+                    Ok(())
+                }),
+                button("c", "change", |mut ctx: Context| {
+                    let input = ctx.read_input()?;
+                    ctx.command_line_mut()
+                        .add_arg(Arg::switch(format!("--change={input}")));
+                    ctx.run_command_line()?;
+                    ctx.show_cmd()?;
                     Ok(())
                 }),
             ],
@@ -351,45 +341,54 @@ pub fn git() -> anyhow::Result<Page> {
     )]);
 
     let page = page([group(
-        "Git Commands",
+        "JJ Commands",
         [
-            button("c", "Commit", move |mut ctx: Context| {
-                ctx.push_page(commit.clone());
-                ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
-                // TODO: enable this later
-                // ctx.command_line_mut().add_arg(Arg::switch("--verbose"));
-                Ok(())
-            }),
+            // button("c", "Commit", move |mut ctx: Context| {
+            //     ctx.push_page(commit.clone());
+            //     ctx.command_line_mut().add_arg(Arg::subcommand("commit"));
+            //     // TODO: enable this later
+            //     // ctx.command_line_mut().add_arg(Arg::switch("--verbose"));
+            //     Ok(())
+            // }),
             button("p", "Push", move |mut ctx: Context| {
                 ctx.push_page(push.clone());
-                ctx.command_line_mut().add_arg(Arg::subcommand("push"));
+                ctx.command_line_mut().add_arg(Arg::new(
+                    ArgOrder::SUBCOMMAND,
+                    ArgValue::Multi(vec!["git".to_string(), "push".to_string()]),
+                ));
                 Ok(())
             }),
             button("f", "Fetch", move |mut ctx: Context| {
                 ctx.push_page(fetch.clone());
-                ctx.command_line_mut().add_arg(Arg::subcommand("fetch"));
+                ctx.command_line_mut().add_arg(Arg::new(
+                    ArgOrder::SUBCOMMAND,
+                    ArgValue::Multi(vec!["git".to_string(), "fetch".to_string()]),
+                ));
+                ctx.run_command_line()?;
+                ctx.show_cmd()?;
+                ctx.pop_page();
                 Ok(())
             }),
             button("d", "Diff", |mut ctx: Context| {
-                ctx.leave_ui()?;
-                ctx.run_command_in_foreground(Command::new("git").arg("diff"))?;
-                ctx.show_cmd()?;
+                ctx.run_command_in_foreground(Command::new("jj").arg("diff"))?;
+                Ok(())
+            }),
+            button("D", "Describe", |mut ctx: Context| {
+                ctx.run_command_in_foreground(Command::new("jj").arg("desc"))?;
                 Ok(())
             }),
             button("l", "Log", |mut ctx: Context| {
-                ctx.leave_ui()?;
-                ctx.run_command_in_foreground(
-                    Command::new("git")
-                        .arg("log")
-                        .arg("--format=oneline")
-                        .arg("--abbrev-commit"),
-                )?;
+                ctx.run_command_in_foreground(Command::new("jj").arg("log"))?;
                 ctx.show_cmd()?;
+                Ok(())
+            }),
+            button("n", "New", |mut ctx: Context| {
+                ctx.run_command_in_foreground(Command::new("jj").arg("new"))?;
                 Ok(())
             }),
         ],
     )])
-    .with_status(git_status()?);
+    .with_status(jj_status()?);
 
     Ok(page)
 }
