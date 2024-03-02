@@ -341,7 +341,7 @@ pub fn git() -> anyhow::Result<Page> {
     )]);
 
     let page = page([group(
-        "JJ Commands",
+        "Commands",
         [
             // button("c", "Commit", move |mut ctx: Context| {
             //     ctx.push_page(commit.clone());
@@ -384,6 +384,10 @@ pub fn git() -> anyhow::Result<Page> {
             }),
             button("n", "New", |mut ctx: Context| {
                 ctx.run_command_in_foreground(Command::new("jj").arg("new"))?;
+                Ok(())
+            }),
+            button("s", "Refresh status", |mut ctx: Context| {
+                ctx.currrent_page_mut().status = Some(jj_status()?);
                 Ok(())
             }),
         ],

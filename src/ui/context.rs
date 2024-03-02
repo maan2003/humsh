@@ -79,6 +79,10 @@ impl<'a, 'b> Context<'a, 'b> {
         self.ui.stack.push((self.command_line().clone(), page));
     }
 
+    pub fn currrent_page_mut(&mut self) -> &mut Page {
+        self.ui.currrent_page_mut()
+    }
+
     pub fn replace_page(&mut self, page: Page) {
         *self.ui.currrent_page_mut() = page;
     }
