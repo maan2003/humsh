@@ -10,7 +10,7 @@ use tokio::runtime;
 use tokio_stream::StreamExt;
 
 use crate::command_line::CommandLine;
-use crate::data::{self, Button, ButtonHandler, Group, Page, ToggleFlag};
+use crate::data::{self, Button, ButtonHandler, ButtonValue, Group, Page, ToggleFlag};
 use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
 pub use context::{Context, ExternalContext, StatusId};
@@ -377,25 +377,33 @@ impl Ui {
             Print(" "),
             Print(&button.description),
         )?;
-        if let Some(hint) = button.hint.as_ref() {
-            queue!(
-                stdout,
-                Print(" ("),
-                PrintStyledContent(self.style.flag_on.apply(hint)),
-                Print(")")
-            )?;
-        } else if let Some(ToggleFlag(a)) = &button.handler.as_any().downcast_ref::<ToggleFlag>() {
-            let selected = self.command_line().args.contains(a);
-            queue!(
-                stdout,
-                Print(" ("),
-                PrintStyledContent(if selected {
-                    self.style.flag_on.apply(a.value.to_string())
-                } else {
-                    self.style.flag_off.apply(a.value.to_string())
-                }),
-                Print(")")
-            )?;
+        if let Some(value) = button.handler.value(self.command_line()) {
+            match value {
+                ButtonValue::String { name, value } => {
+                    queue!(
+                        stdout,
+                        Print(" ("),
+                        PrintStyledContent(if let Some(value) = value {
+                            self.style.flag_on.apply(format!("{name}={value}"))
+                        } else {
+                            self.style.flag_off.apply(name.to_string())
+                        }),
+                        Print(")")
+                    )?;
+                }
+                ButtonValue::Bool { name, value } => {
+                    queue!(
+                        stdout,
+                        Print(" ("),
+                        PrintStyledContent(if value {
+                            self.style.flag_on.apply(name)
+                        } else {
+                            self.style.flag_off.apply(name)
+                        }),
+                        Print(")")
+                    )?;
+                }
+            }
         }
         Ok(())
     }

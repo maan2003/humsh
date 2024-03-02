@@ -1,12 +1,10 @@
 mod shell_context;
 
+use std::borrow::Cow;
 use std::process::Command;
-use std::sync::Mutex;
 use std::{process::Stdio, sync::Arc};
 
-use anyhow::Context as _;
-
-use crate::command_line::{Arg, ArgOrder, ArgValue, CommandLine};
+use crate::command_line::{Arg, CommandLine};
 use crate::ui::Context;
 
 use self::shell_context::ShellContext;
@@ -19,7 +17,6 @@ pub struct Button {
     pub key: Keybind,
     pub description: String,
     pub handler: Arc<dyn ButtonHandler>,
-    pub hint: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -41,8 +38,23 @@ pub struct Program {
     pub start: Page,
 }
 
+pub enum ButtonValue<'a> {
+    String {
+        name: &'a str,
+        value: Option<&'a str>,
+    },
+    Bool {
+        name: &'a str,
+        value: bool,
+    },
+}
+
 pub trait ButtonHandler {
     fn run(&self, ctx: Context<'_, '_>) -> anyhow::Result<()>;
+    fn value(&self, command_line: &CommandLine) -> Option<ButtonValue<'_>> {
+        let _ = command_line;
+        None
+    }
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
@@ -96,13 +108,6 @@ impl Page {
     }
 }
 
-impl Button {
-    pub fn with_hint(mut self, hint: impl Into<Option<String>>) -> Self {
-        self.hint = hint.into();
-        self
-    }
-}
-
 fn select_branch(extra_args: &str) -> anyhow::Result<String> {
     let output = std::process::Command::new("bash")
         .arg("-c")
@@ -129,20 +134,25 @@ fn select_directory() -> anyhow::Result<String> {
     Ok(output_text)
 }
 
-pub struct ToggleFlag(pub Arg);
+pub struct ToggleFlag(pub Cow<'static, str>);
 
 impl ButtonHandler for ToggleFlag {
     fn run(&self, mut ctx: Context<'_, '_>) -> anyhow::Result<()> {
-        ctx.command_line_mut().toggle_arg(self.0.clone());
+        ctx.command_line_mut()
+            .toggle_arg(Arg::switch(self.0.as_ref()));
         Ok(())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self as _
     }
-}
-fn toggle_flag(flag: &str) -> ToggleFlag {
-    ToggleFlag(Arg::switch(flag))
+
+    fn value(&self, command_line: &CommandLine) -> Option<ButtonValue<'_>> {
+        Some(ButtonValue::Bool {
+            name: self.0.as_ref(),
+            value: command_line.args.contains(&Arg::switch(self.0.as_ref())),
+        })
+    }
 }
 
 pub fn page(groups: impl Into<Vec<Group>>) -> Page {
@@ -169,12 +179,11 @@ pub fn button(
         key: Keybind(key.into()),
         description: description.into(),
         handler: Arc::new(handler),
-        hint: None,
     }
 }
 
-pub fn flag_button(key: &'static str, description: &str, flag: &str) -> Button {
-    button(key, description, ToggleFlag(Arg::switch(flag)))
+pub fn flag_button(key: &'static str, description: &str, flag: &'static str) -> Button {
+    button(key, description, ToggleFlag(Cow::Borrowed(flag)))
 }
 
 pub fn top() -> anyhow::Result<Program> {
