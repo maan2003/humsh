@@ -1,4 +1,3 @@
-mod cp;
 mod shell_context;
 
 use std::process::Command;
@@ -223,18 +222,6 @@ fn home_page() -> Result<Page, anyhow::Error> {
             ctx.run_command_new_term(Command::new("hx").arg("."))?;
             Ok(())
         }));
-    }
-    if shell_context.is_cp() {
-        builtin_buttons.push(button(
-            "C",
-            "Competitive programming",
-            |mut ctx: Context| {
-                let current_dir = std::env::current_dir()?;
-                let cp = cp::Cp::new(current_dir)?;
-                ctx.push_page(cp::cp_page(Arc::new(Mutex::new(cp)))?);
-                Ok(())
-            },
-        ));
     }
     let mut page = page([group("Builtin commands", builtin_buttons)]);
     if let Some(config) = shell_context.user_config() {
