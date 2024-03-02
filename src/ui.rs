@@ -92,6 +92,7 @@ impl Ui {
         loop {
             terminal::enable_raw_mode()?;
             if !self.showing_cmd {
+                self.currrent_page_mut().refresh_status().ok();
                 self.draw(&mut stdout)?;
             }
             let event: anyhow::Result<_> = runtime::Handle::current().block_on(async {
@@ -342,7 +343,7 @@ impl Ui {
     }
 
     fn draw_page(&self, page: &Page, stdout: Stdout) -> Result<(), std::io::Error> {
-        if let Some(status) = &page.status {
+        if let Some(status) = page.status() {
             execute!(stdout, Print(status.replace('\n', "\r\n")), NextLine)?;
         }
         for group in &page.groups {

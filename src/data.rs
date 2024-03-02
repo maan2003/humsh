@@ -29,13 +29,14 @@ pub struct Group {
     pub buttons: Vec<Button>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Page {
-    pub status: Option<String>,
+    pub status: Option<Arc<dyn Fn() -> anyhow::Result<String>>>,
+    pub status_cache: Option<String>,
     pub groups: Vec<Group>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Program {
     pub base: CommandLine,
     pub start: Page,
@@ -69,13 +70,26 @@ impl Page {
     pub fn empty() -> Self {
         Self {
             status: None,
+            status_cache: None,
             groups: Vec::new(),
         }
     }
 
-    pub fn with_status(mut self, status: impl Into<String>) -> Self {
-        self.status = Some(status.into());
+    pub fn with_status<F>(mut self, status: F) -> Self
+    where
+        F: Fn() -> anyhow::Result<String> + 'static,
+    {
+        self.status = Some(Arc::new(status));
         self
+    }
+
+    pub fn refresh_status(&mut self) -> anyhow::Result<()> {
+        self.status_cache = self.status.as_ref().map(|x| x()).transpose()?;
+        Ok(())
+    }
+
+    pub fn status(&self) -> Option<&str> {
+        self.status_cache.as_deref()
     }
 
     pub fn add_group(&mut self, group: Group) {
@@ -135,6 +149,7 @@ fn toggle_flag(flag: &str) -> ToggleFlag {
 pub fn page(groups: impl Into<Vec<Group>>) -> Page {
     Page {
         status: None,
+        status_cache: None,
         groups: groups.into(),
     }
 }
@@ -294,12 +309,32 @@ pub fn exec_button(
     })
 }
 
-pub fn args_page(
-    name: &str,
-    args: impl Into<Vec<Button>>,
-    actions: impl Into<Vec<Button>>,
-) -> Page {
-    page([group("Arguments", args.into()), group(name, actions.into())])
+pub fn exec_button_arg_prompt(
+    key: &'static str,
+    description: &str,
+    args: impl IntoIterator<Item = Arg>,
+    page_action: PageAction,
+    arg_prompt: &'static str,
+) -> Button {
+    let args: Vec<_> = args.into_iter().collect();
+    button(key, description, move |mut ctx: Context| {
+        let result = prompt_arg(&mut ctx, arg_prompt);
+        let result = result.and_then(|_| exec_cmd(&mut ctx, args.clone()));
+        match page_action {
+            PageAction::Pop => {
+                ctx.pop_page();
+            }
+            PageAction::None => {}
+        }
+        result
+    })
+}
+
+pub fn args_page(args: impl Into<Vec<Button>>, actions: impl Into<Vec<Button>>) -> Page {
+    page([
+        group("Arguments", args.into()),
+        group("Action", actions.into()),
+    ])
 }
 
 pub fn subcommand_page_button<I>(
@@ -313,7 +348,7 @@ where
     I: IntoIterator,
     I::Item: Into<String>,
 {
-    subcommand_button(key, name, cmd_args, args_page(name, args, actions))
+    subcommand_button(key, name, cmd_args, args_page(args, actions))
 }
 
 pub fn git() -> anyhow::Result<Page> {
@@ -330,12 +365,7 @@ pub fn git() -> anyhow::Result<Page> {
                 ],
                 [
                     exec_button("p", "Push", [], PageAction::Pop),
-                    button("c", "change", |mut ctx: Context| {
-                        prompt_arg(&mut ctx, "change")?;
-                        exec_cmd(&mut ctx, vec![])?;
-                        ctx.pop_page();
-                        Ok(())
-                    }),
+                    exec_button_arg_prompt("c", "Change", [], PageAction::Pop, "change"),
                 ],
             ),
             exec_button(
@@ -347,15 +377,20 @@ pub fn git() -> anyhow::Result<Page> {
             exec_button("d", "Diff", [Arg::subcommand("diff")], PageAction::None),
             exec_button("D", "Describe", [Arg::subcommand("desc")], PageAction::None),
             exec_button("l", "Log", [Arg::subcommand("log")], PageAction::None),
-            exec_button("n", "New", [Arg::subcommand("new")], PageAction::None),
+            subcommand_page_button(
+                "n",
+                "New",
+                ["new"],
+                [],
+                [exec_button("n", "New", [], PageAction::Pop)],
+            ),
             exec_button("S", "Squash", [Arg::subcommand("squash")], PageAction::None),
             button("s", "Refresh status", |mut ctx: Context| {
-                ctx.currrent_page_mut().status = Some(jj_status()?);
-                Ok(())
+                ctx.currrent_page_mut().refresh_status()
             }),
         ],
     )])
-    .with_status(jj_status()?);
+    .with_status(jj_status);
 
     Ok(page)
 }
