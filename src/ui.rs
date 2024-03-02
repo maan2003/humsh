@@ -10,7 +10,7 @@ use tokio::runtime;
 use tokio_stream::StreamExt;
 
 use crate::command_line::CommandLine;
-use crate::data::{self, Button, Callback, Group, Page, ToggleFlag};
+use crate::data::{self, Button, ButtonHandler, Group, Page, ToggleFlag};
 use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
 pub use context::{Context, ExternalContext, StatusId};
@@ -115,7 +115,7 @@ impl Ui {
                     exit: &mut exit,
                 };
                 // FIXME proper error handling
-                if let Err(e) = callback.call(ctx) {
+                if let Err(e) = callback.run(ctx) {
                     self.leave_ui(&mut stdout)?;
                     self.showing_cmd = true;
                     execute!(
@@ -208,7 +208,10 @@ impl Ui {
         Ok(())
     }
 
-    pub fn process_event(&mut self, event: Event) -> anyhow::Result<Option<Arc<dyn Callback>>> {
+    pub fn process_event(
+        &mut self,
+        event: Event,
+    ) -> anyhow::Result<Option<Arc<dyn ButtonHandler>>> {
         match event {
             Event::Term(crossterm::event::Event::Key(key)) => self.handle_key(key),
             Event::Term(_) => Ok(None),
@@ -226,7 +229,7 @@ impl Ui {
     fn handle_key(
         &mut self,
         key: crossterm::event::KeyEvent,
-    ) -> anyhow::Result<Option<Arc<dyn Callback>>> {
+    ) -> anyhow::Result<Option<Arc<dyn ButtonHandler>>> {
         let page = &self.stack.last().expect("stack must not be empty").1;
         if let Some(mux) = &mut self.multi_term {
             if let crossterm::event::KeyCode::Char(c) = key.code {
@@ -247,7 +250,7 @@ impl Ui {
             page.groups
                 .iter()
                 .flat_map(|x| &x.buttons)
-                .map(|b| (&b.key, &b.callback)),
+                .map(|b| (&b.key, &b.handler)),
         )
     }
 
@@ -381,7 +384,7 @@ impl Ui {
                 PrintStyledContent(self.style.flag_on.apply(hint)),
                 Print(")")
             )?;
-        } else if let Some(ToggleFlag(a)) = &button.callback.as_any().downcast_ref::<ToggleFlag>() {
+        } else if let Some(ToggleFlag(a)) = &button.handler.as_any().downcast_ref::<ToggleFlag>() {
             let selected = self.command_line().args.contains(a);
             queue!(
                 stdout,

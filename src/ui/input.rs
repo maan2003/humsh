@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::data::{Callback, Keybind};
+use crate::data::{ButtonHandler, Keybind};
 
 use super::Context;
 
@@ -27,8 +27,8 @@ impl KeyHandler {
     pub fn handle_key<'a>(
         &mut self,
         key: KeyEvent,
-        bindings: impl Iterator<Item = (&'a Keybind, &'a Arc<dyn Callback>)>,
-    ) -> anyhow::Result<Option<Arc<dyn Callback>>> {
+        bindings: impl Iterator<Item = (&'a Keybind, &'a Arc<dyn ButtonHandler>)>,
+    ) -> anyhow::Result<Option<Arc<dyn ButtonHandler>>> {
         let key = match key.code {
             KeyCode::Char('`') => {
                 self.reset();

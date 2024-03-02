@@ -19,7 +19,7 @@ pub struct Keybind(pub String);
 pub struct Button {
     pub key: Keybind,
     pub description: String,
-    pub callback: Arc<dyn Callback>,
+    pub handler: Arc<dyn ButtonHandler>,
     pub hint: Option<String>,
 }
 
@@ -42,22 +42,22 @@ pub struct Program {
     pub start: Page,
 }
 
-pub trait Callback {
-    fn call(&self, ctx: Context<'_, '_>) -> anyhow::Result<()>;
+pub trait ButtonHandler {
+    fn run(&self, ctx: Context<'_, '_>) -> anyhow::Result<()>;
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
-impl std::fmt::Debug for dyn Callback {
+impl std::fmt::Debug for dyn ButtonHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Callback").finish_non_exhaustive()
     }
 }
 
-impl<F> Callback for F
+impl<F> ButtonHandler for F
 where
     F: Fn(Context) -> anyhow::Result<()> + 'static,
 {
-    fn call(&self, ctx: Context<'_, '_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: Context<'_, '_>) -> anyhow::Result<()> {
         self(ctx)
     }
 
@@ -132,8 +132,8 @@ fn select_directory() -> anyhow::Result<String> {
 
 pub struct ToggleFlag(pub Arg);
 
-impl Callback for ToggleFlag {
-    fn call(&self, mut ctx: Context<'_, '_>) -> anyhow::Result<()> {
+impl ButtonHandler for ToggleFlag {
+    fn run(&self, mut ctx: Context<'_, '_>) -> anyhow::Result<()> {
         ctx.command_line_mut().toggle_arg(self.0.clone());
         Ok(())
     }
@@ -164,12 +164,12 @@ pub fn group(description: impl Into<String>, buttons: impl Into<Vec<Button>>) ->
 pub fn button(
     key: impl Into<String>,
     description: impl Into<String>,
-    callback: impl Callback + 'static,
+    handler: impl ButtonHandler + 'static,
 ) -> Button {
     Button {
         key: Keybind(key.into()),
         description: description.into(),
-        callback: Arc::new(callback),
+        handler: Arc::new(handler),
         hint: None,
     }
 }
@@ -213,7 +213,7 @@ fn home_page() -> Result<Page, anyhow::Error> {
     ];
     if shell_context.is_git() {
         builtin_buttons.push(button("j", "Jujutsu", |mut ctx: Context| {
-            ctx.push_page(git()?);
+            ctx.push_page(jj::jj()?);
             ctx.command_line_mut().add_arg(Arg::program("jj"));
             Ok(())
         }));
@@ -245,14 +245,6 @@ fn home_page() -> Result<Page, anyhow::Error> {
         page.add_group(group("Project commands", config.command_buttons()));
     }
     Ok(page)
-}
-
-fn jj_status() -> anyhow::Result<String> {
-    let output = Command::new("jj")
-        .arg("status")
-        .arg("--color=always")
-        .output()?;
-    Ok(String::from_utf8(output.stdout)?)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -351,46 +343,4 @@ where
     subcommand_button(key, name, cmd_args, args_page(args, actions))
 }
 
-pub fn git() -> anyhow::Result<Page> {
-    let page = page([group(
-        "Commands",
-        [
-            subcommand_page_button(
-                "p",
-                "Push",
-                ["git", "push"],
-                [
-                    flag_button("-d", "Deleted", "--deleted"),
-                    flag_button("-n", "Dry run", "--dry-run"),
-                ],
-                [
-                    exec_button("p", "Push", [], PageAction::Pop),
-                    exec_button_arg_prompt("c", "Change", [], PageAction::Pop, "change"),
-                ],
-            ),
-            exec_button(
-                "f",
-                "Fetch",
-                [Arg::subcommands(["git", "fetch"])],
-                PageAction::None,
-            ),
-            exec_button("d", "Diff", [Arg::subcommand("diff")], PageAction::None),
-            exec_button("D", "Describe", [Arg::subcommand("desc")], PageAction::None),
-            exec_button("l", "Log", [Arg::subcommand("log")], PageAction::None),
-            subcommand_page_button(
-                "n",
-                "New",
-                ["new"],
-                [],
-                [exec_button("n", "New", [], PageAction::Pop)],
-            ),
-            exec_button("S", "Squash", [Arg::subcommand("squash")], PageAction::None),
-            button("s", "Refresh status", |mut ctx: Context| {
-                ctx.currrent_page_mut().refresh_status()
-            }),
-        ],
-    )])
-    .with_status(jj_status);
-
-    Ok(page)
-}
+mod jj;
