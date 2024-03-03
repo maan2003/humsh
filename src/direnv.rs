@@ -61,8 +61,8 @@ impl Direnv {
     }
 
     pub fn hook(&mut self, cmd: &mut std::process::Command) -> anyhow::Result<()> {
-        let env = self.env()?;
-        cmd.envs(env.iter().cloned());
+        // let env = self.env()?;
+        // cmd.envs(env.iter().cloned());
         Ok(())
     }
 }
