@@ -15,7 +15,7 @@ fn main() -> Result<()> {
         .enable_all()
         .build()?;
     let _guard = rt.enter();
-    let program = data::top()?;
+    let program = data::jj()?;
     ui::Ui::new(program)?.run()?;
     Ok(())
 }

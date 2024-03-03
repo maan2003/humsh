@@ -278,6 +278,13 @@ pub fn flag_button(key: &'static str, description: &str, flag: &'static str) -> 
     }
 }
 
+pub fn jj() -> anyhow::Result<Program> {
+    let start = jj::jj()?;
+    Ok(Program {
+        base: CommandLine::from_iter([Arg::program("jj")]),
+        start,
+    })
+}
 pub fn top() -> anyhow::Result<Program> {
     let start = home_page()?;
     Ok(Program {
