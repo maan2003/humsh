@@ -415,10 +415,12 @@ pub fn exec_button_arg_prompt(
 }
 
 pub fn args_page(args: impl Into<Vec<Button>>, actions: impl Into<Vec<Button>>) -> Page {
-    page([
-        group("Arguments", args.into()),
-        group("Action", actions.into()),
-    ])
+    let args = args.into();
+    if !args.is_empty() {
+        page([group("Arguments", args), group("Action", actions.into())])
+    } else {
+        page([group("Action", actions.into())])
+    }
 }
 
 pub fn subcommand_page_button<I>(
