@@ -17,47 +17,55 @@ fn shell_cmd(bash_cmd: impl Into<String>) -> Command {
     cmd
 }
 
-fn jj_select_rev(ctx: &mut Context) -> anyhow::Result<Vec<String>> {
-    ctx.leave_ui()?;
-    let output = shell_cmd("jj log -r '::' --no-graph --color=always | fzf --ansi --multi")
+fn jj_select_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<String>> {
+    move |ctx| {
+        ctx.leave_ui()?;
+        let output = shell_cmd(format!(
+            "jj log -r '::' --no-graph --color=always | fzf --ansi --multi --prompt '{arg}'"
+        ))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
-    let output_text = String::from_utf8(output.stdout)?;
-    let revs = output_text
-        .trim()
-        .lines()
-        .map(|x| {
-            x.get(0..x.find(' ').context("invalid output")?)
-                .context("invalid output")
-                .map(|x| x.to_string())
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(revs)
+        let output_text = String::from_utf8(output.stdout)?;
+        let revs = output_text
+            .trim()
+            .lines()
+            .map(|x| {
+                x.get(0..x.find(' ').context("invalid output")?)
+                    .context("invalid output")
+                    .map(|x| x.to_string())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(revs)
+    }
 }
 
-fn jj_select_branch(ctx: &mut Context) -> anyhow::Result<Vec<String>> {
-    ctx.leave_ui()?;
-    let output = shell_cmd("jj branch list --color=always | fzf --ansi --multi")
+fn jj_select_branch(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<String>> {
+    move |ctx| {
+        ctx.leave_ui()?;
+        let output = shell_cmd(format!(
+            "jj branch list --color=always | fzf --ansi --multi --prompt '{arg}'"
+        ))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
-    let output_text = String::from_utf8(output.stdout)?;
-    let revs = output_text
-        .trim()
-        .lines()
-        .map(|x| {
-            x.get(0..x.find(':').context("invalid output")?)
-                .context("invalid output")
-                .map(|x| x.to_string())
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(revs)
+        let output_text = String::from_utf8(output.stdout)?;
+        let revs = output_text
+            .trim()
+            .lines()
+            .map(|x| {
+                x.get(0..x.find(':').context("invalid output")?)
+                    .context("invalid output")
+                    .map(|x| x.to_string())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(revs)
+    }
 }
 
 fn jj_prompt_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
     move |ctx| {
-        let revs = jj_select_rev(ctx)?;
+        let revs = jj_select_rev(arg)(ctx)?;
         let mut args = vec![];
         for rev in revs {
             args.push(Arg::switch(format!("{arg}{rev}")));
@@ -68,7 +76,7 @@ fn jj_prompt_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<V
 
 fn jj_prompt_branch(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
     move |ctx| {
-        let revs = jj_select_branch(ctx)?;
+        let revs = jj_select_branch(arg)(ctx)?;
         let mut args = vec![];
         for rev in revs {
             args.push(Arg::switch(format!("{arg}{rev}")));
@@ -91,7 +99,13 @@ pub fn jj() -> anyhow::Result<Page> {
                 ],
                 [
                     exec_button("p", "Push", [], PageAction::Pop),
-                    exec_button_arg_prompt("c", "Change", [], PageAction::Pop, jj_prompt_rev("-c")),
+                    exec_button_arg_prompt(
+                        "c",
+                        "Change",
+                        [],
+                        PageAction::Pop,
+                        jj_prompt_rev("--change="),
+                    ),
                 ],
             ),
             exec_button(
@@ -162,8 +176,8 @@ pub fn jj() -> anyhow::Result<Page> {
                 [
                     flag_button("i", "Interactive", "--interactive"),
                     flag_button("e", "Skip Empty", "--skip-empty"),
-                    prompt_button("b", "Branch", "--branch", jj_select_branch),
-                    prompt_button("s", "Source", "--source", jj_select_rev),
+                    prompt_button("b", "Branch", "--branch", jj_select_branch("--branch=")),
+                    prompt_button("s", "Source", "--source", jj_select_rev("--source=")),
                 ],
                 [exec_button_arg_prompt(
                     "r",
@@ -171,6 +185,20 @@ pub fn jj() -> anyhow::Result<Page> {
                     [],
                     PageAction::Pop,
                     jj_prompt_rev("--destination="),
+                )],
+            ),
+            subcommand_page_button(
+                "m",
+                "Move",
+                ["move"],
+                [flag_button("i", "Interactive", "--interactive")],
+                [exec_button_arg_prompt2(
+                    "m",
+                    "Move",
+                    [],
+                    PageAction::Pop,
+                    jj_prompt_rev("--from="),
+                    jj_prompt_rev("--to="),
                 )],
             ),
             subcommand_page_button(
