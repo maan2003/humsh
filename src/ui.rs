@@ -255,10 +255,10 @@ impl Ui {
     }
 
     pub fn draw(&self, stdout: Stdout) -> anyhow::Result<()> {
-        let tabs = match &self.multi_term {
-            Some(mux) if self.stack.len() == 1 => Some(mux.list_windows()?),
-            _ => None,
-        };
+        // let tabs = match &self.multi_term {
+        //     Some(mux) if self.stack.len() == 1 => Some(mux.list_windows()?),
+        //     _ => None,
+        // };
         self.enter_ui(stdout)?;
         let (_, height) = terminal::size()?;
         // hack: to make terminal keep scrolling
@@ -269,9 +269,9 @@ impl Ui {
         )?;
         self.draw_page(self.currrent_page(), stdout)?;
 
-        if let Some(tabs) = tabs {
-            self.draw_tabs(&tabs, stdout)?;
-        }
+        // if let Some(tabs) = tabs {
+        //     self.draw_tabs(&tabs, stdout)?;
+        // }
 
         self.draw_prompt(stdout)?;
         stdout.flush()?;
