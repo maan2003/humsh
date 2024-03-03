@@ -60,7 +60,7 @@ fn jj_prompt_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<V
         let revs = jj_select_rev(ctx)?;
         let mut args = vec![];
         for rev in revs {
-            args.push(Arg::switch(format!("--{arg}={rev}")));
+            args.push(Arg::switch(format!("{arg}{rev}")));
         }
         Ok(args)
     }
@@ -71,7 +71,7 @@ fn jj_prompt_branch(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Resul
         let revs = jj_select_branch(ctx)?;
         let mut args = vec![];
         for rev in revs {
-            args.push(Arg::switch(format!("--{arg}={rev}")));
+            args.push(Arg::switch(format!("{arg}{rev}")));
         }
         Ok(args)
     }
@@ -91,13 +91,7 @@ pub fn jj() -> anyhow::Result<Page> {
                 ],
                 [
                     exec_button("p", "Push", [], PageAction::Pop),
-                    exec_button_arg_prompt(
-                        "c",
-                        "Change",
-                        [],
-                        PageAction::Pop,
-                        jj_prompt_rev("change"),
-                    ),
+                    exec_button_arg_prompt("c", "Change", [], PageAction::Pop, jj_prompt_rev("-c")),
                 ],
             ),
             exec_button(
@@ -107,7 +101,22 @@ pub fn jj() -> anyhow::Result<Page> {
                 PageAction::None,
             ),
             exec_button("d", "Diff", [Arg::subcommand("diff")], PageAction::None),
-            exec_button("D", "Describe", [Arg::subcommand("desc")], PageAction::None),
+            subcommand_page_button(
+                "D",
+                "Describe",
+                ["desc"],
+                [
+                    flag_button("a", "Reset Author", "--reset-author"),
+                    flag_button("E", "No Edit", "--no-edit"),
+                ],
+                [exec_button_arg_prompt(
+                    "D",
+                    "Describe",
+                    [],
+                    PageAction::Pop,
+                    jj_prompt_rev(""),
+                )],
+            ),
             exec_button("l", "Log", [Arg::subcommand("log")], PageAction::None),
             subcommand_page_button(
                 "n",
@@ -116,24 +125,28 @@ pub fn jj() -> anyhow::Result<Page> {
                 [
                     flag_button("a", "After", "--insert-after"),
                     flag_button("b", "Before", "--insert-before"),
+                    flag_button("E", "No edit", "--no-edit"),
                 ],
-                [exec_button("n", "New", [], PageAction::Pop)],
+                [exec_button_arg_prompt(
+                    "n",
+                    "New",
+                    [],
+                    PageAction::Pop,
+                    jj_prompt_rev(""),
+                )],
             ),
             subcommand_page_button(
                 "S",
                 "Squash",
                 ["squash"],
                 [flag_button("i", "Interactive", "--interactive")],
-                [
-                    exec_button("S", "Squash", [], PageAction::Pop),
-                    exec_button_arg_prompt(
-                        "r",
-                        "Revision",
-                        [],
-                        PageAction::Pop,
-                        jj_prompt_rev("revision"),
-                    ),
-                ],
+                [exec_button_arg_prompt(
+                    "S",
+                    "Squash",
+                    [],
+                    PageAction::Pop,
+                    jj_prompt_rev("--revision="),
+                )],
             ),
             subcommand_page_button(
                 "c",
@@ -157,8 +170,52 @@ pub fn jj() -> anyhow::Result<Page> {
                     "Rebase",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev("destination"),
+                    jj_prompt_rev("--destination="),
                 )],
+            ),
+            subcommand_page_button(
+                "b",
+                "Branch",
+                [],
+                [],
+                [
+                    button("c", "Create", |mut ctx| {
+                        let revs = jj_prompt_rev("--revision=")(&mut ctx)?;
+                        let mut command_line = ctx.command_line().clone();
+                        command_line.args.extend(revs);
+                        let branch = ctx.read_input("Branches")?;
+                        command_line.add_arg(Arg::subcommands(["branch", "create"]));
+                        command_line.add_arg(Arg::positional(branch));
+                        ctx.run_command_line_other(&command_line)?;
+                        Ok(())
+                    }),
+                    button("s", "Set", |mut ctx| {
+                        let revs = jj_prompt_rev("--revision=")(&mut ctx)?;
+                        let branch = jj_prompt_branch("")(&mut ctx)?;
+                        let mut command_line = ctx.command_line().clone();
+                        command_line.args.extend(revs);
+                        command_line.args.extend(branch);
+                        command_line.add_arg(Arg::subcommands(["branch", "set"]));
+                        command_line.add_arg(Arg::switch("--allow-backwards"));
+                        ctx.run_command_line_other(&command_line)?;
+                        Ok(())
+                    }),
+                    button("d", "Delete", |mut ctx| {
+                        let branch = jj_prompt_branch("")(&mut ctx)?;
+                        let mut command_line = ctx.command_line().clone();
+                        command_line.args.extend(branch);
+                        command_line.add_arg(Arg::subcommands(["branch", "delete"]));
+                        ctx.run_command_line_other(&command_line)?;
+                        Ok(())
+                    }),
+                ],
+            ),
+            exec_button_arg_prompt(
+                "e",
+                "Edit",
+                [Arg::subcommand("edit")],
+                PageAction::None,
+                jj_prompt_rev(""),
             ),
             button("s", "Refresh status", |mut ctx| {
                 ctx.currrent_page_mut().refresh_status()

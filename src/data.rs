@@ -363,8 +363,7 @@ pub fn prompt_arg(
 
 pub fn subcommand_button<I>(key: &'static str, description: &str, args: I, page: Page) -> Button
 where
-    I: IntoIterator,
-    I::Item: Into<String>,
+    I: IntoIterator<Item = &'static str>,
 {
     let arg = Arg::subcommands(args);
     button(key, description, move |mut ctx| {
@@ -402,6 +401,7 @@ pub fn exec_button_arg_prompt(
 ) -> Button {
     let args: Vec<_> = args.into_iter().collect();
     button(key, description, move |mut ctx| {
+        let command_line_save = ctx.command_line().clone();
         let mut run = || {
             prompt_arg(&mut ctx, &prompt_fn)?;
             exec_cmd(&mut ctx, args.clone())
@@ -411,7 +411,9 @@ pub fn exec_button_arg_prompt(
             PageAction::Pop => {
                 ctx.pop_page();
             }
-            PageAction::None => {}
+            PageAction::None => {
+                *ctx.command_line_mut() = command_line_save;
+            }
         }
         result
     })
@@ -459,8 +461,7 @@ pub fn subcommand_page_button<I>(
     actions: impl Into<Vec<Button>>,
 ) -> Button
 where
-    I: IntoIterator,
-    I::Item: Into<String>,
+    I: IntoIterator<Item = &'static str>,
 {
     subcommand_button(key, name, cmd_args, args_page(args, actions))
 }
