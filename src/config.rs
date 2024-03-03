@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use crate::{data, ui::Context};
+use crate::{data};
 
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 pub struct Config {
