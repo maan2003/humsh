@@ -215,6 +215,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         command_line.add_arg(Arg::subcommands(["branch", "create"]));
                         command_line.add_arg(Arg::positional(branch));
                         ctx.run_command_line_other(&command_line)?;
+                        ctx.pop_page();
                         Ok(())
                     }),
                     button("s", "Set", |mut ctx| {
@@ -226,6 +227,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         command_line.add_arg(Arg::subcommands(["branch", "set"]));
                         command_line.add_arg(Arg::switch("--allow-backwards"));
                         ctx.run_command_line_other(&command_line)?;
+                        ctx.pop_page();
                         Ok(())
                     }),
                     button("d", "Delete", |mut ctx| {
@@ -234,6 +236,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         command_line.args.extend(branch);
                         command_line.add_arg(Arg::subcommands(["branch", "delete"]));
                         ctx.run_command_line_other(&command_line)?;
+                        ctx.pop_page();
                         Ok(())
                     }),
                 ],
