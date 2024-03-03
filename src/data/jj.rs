@@ -17,15 +17,34 @@ fn shell_cmd(bash_cmd: impl Into<String>) -> Command {
     cmd
 }
 
-fn jj_select_rev(ctx: &mut Context) -> anyhow::Result<String> {
+fn jj_select_rev(ctx: &mut Context) -> anyhow::Result<Vec<String>> {
     ctx.leave_ui()?;
-    let output = shell_cmd("jj log -r '::' --no-graph --color=always | fzf --ansi")
+    let output = shell_cmd("jj log -r '::' --no-graph --color=always | fzf --ansi --multi")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
-    let mut output_text = String::from_utf8(output.stdout)?;
-    output_text.truncate(output_text.find(' ').context("invalid output")?);
-    Ok(output_text)
+    let output_text = String::from_utf8(output.stdout)?;
+    let revs = output_text
+        .trim()
+        .lines()
+        .map(|x| {
+            x.get(0..x.find(' ').context("invalid output")?)
+                .context("invalid output")
+                .map(|x| x.to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(revs)
+}
+
+fn jj_prompt_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
+    move |ctx| {
+        let revs = jj_select_rev(ctx)?;
+        let mut args = vec![];
+        for rev in revs {
+            args.push(Arg::switch(format!("--{arg}={rev}")));
+        }
+        Ok(args)
+    }
 }
 
 pub fn jj() -> anyhow::Result<Page> {
@@ -39,7 +58,6 @@ pub fn jj() -> anyhow::Result<Page> {
                 [
                     flag_button("d", "Deleted", "--deleted"),
                     flag_button("n", "Dry run", "--dry-run"),
-                    prompt_button("r", "Revision", "--revision", jj_select_rev),
                 ],
                 [
                     exec_button("p", "Push", [], PageAction::Pop),
@@ -48,8 +66,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         "Change",
                         [],
                         PageAction::Pop,
-                        "change",
-                        jj_select_rev,
+                        jj_prompt_rev("change"),
                     ),
                 ],
             ),

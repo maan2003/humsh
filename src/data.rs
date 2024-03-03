@@ -44,7 +44,7 @@ pub struct Program {
 pub enum ButtonValue<'a> {
     String {
         name: &'a str,
-        value: Option<&'a str>,
+        value: Option<Cow<'a, str>>,
     },
     Bool {
         name: &'a str,
@@ -159,7 +159,7 @@ impl ButtonHandler for ToggleFlag {
 }
 
 pub struct PromptButton {
-    f: Box<dyn Fn(&mut Context<'_, '_>) -> anyhow::Result<String>>,
+    f: Box<dyn Fn(&mut Context<'_, '_>) -> anyhow::Result<Vec<String>>>,
     arg: String,
 }
 
@@ -170,7 +170,7 @@ impl ButtonHandler for PromptButton {
             self.unset_value(ctx.command_line_mut());
         } else {
             let value = (self.f)(&mut ctx)?;
-            self.set_value(ctx.command_line_mut(), value);
+            self.set_values(ctx.command_line_mut(), value);
         }
 
         Ok(())
@@ -183,24 +183,35 @@ impl ButtonHandler for PromptButton {
     fn value<'a>(&'a self, command_line: &'a CommandLine) -> Option<ButtonValue<'a>> {
         Some(ButtonValue::String {
             name: &self.arg,
-            value: self.get_value(command_line),
+            value: self.get_value(command_line).map(Cow::Owned),
         })
     }
 }
 
 impl PromptButton {
-    fn get_value<'a>(&self, cmd_line: &'a CommandLine) -> Option<&'a str> {
+    fn get_value(&self, cmd_line: &CommandLine) -> Option<String> {
         cmd_line.args.iter().find_map(|arg| match &arg.value {
-            ArgValue::Multi(m) if m.first()? == &self.arg => m.get(1).map(|x| x.as_str()),
+            ArgValue::Multi(m) if m.first()? == &self.arg => Some(
+                m.iter()
+                    .enumerate()
+                    .filter(|(i, _)| i % 2 == 1)
+                    .map(|(_, x)| x.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ),
             _ => None,
         })
     }
-    fn set_value(&self, cmd_line: &mut CommandLine, value: String) {
-        cmd_line.add_arg(Arg::new(
-            ArgOrder::FLAG,
-            ArgValue::Multi(vec![self.arg.clone(), value]),
-        ));
+    fn set_values(&self, cmd_line: &mut CommandLine, values: Vec<String>) {
+        let mut args = vec![];
+        for value in values {
+            args.push(self.arg.clone());
+            args.push(value);
+        }
+
+        cmd_line.add_arg(Arg::new(ArgOrder::FLAG, ArgValue::Multi(args)));
     }
+
     fn unset_value(&self, cmd_line: &mut CommandLine) {
         let arg = cmd_line
             .args
@@ -247,7 +258,7 @@ pub fn prompt_button(
     key: impl Into<String>,
     description: impl Into<String>,
     name: &str,
-    handler: impl Fn(&mut Context) -> anyhow::Result<String> + 'static,
+    handler: impl Fn(&mut Context) -> anyhow::Result<Vec<String>> + 'static,
 ) -> Button {
     Button {
         key: Keybind(key.into()),
@@ -341,12 +352,12 @@ pub fn exec_cmd(ctx: &mut Context, args: Vec<Arg>) -> anyhow::Result<()> {
 
 pub fn prompt_arg(
     ctx: &mut Context,
-    arg_name: &str,
-    prompt_fn: impl Fn(&mut Context) -> Result<String>,
+    prompt_fn: impl Fn(&mut Context) -> Result<Vec<Arg>>,
 ) -> anyhow::Result<()> {
-    let input = prompt_fn(ctx)?;
-    ctx.command_line_mut()
-        .add_arg(Arg::switch(format!("--{arg_name}={input}")));
+    let args = prompt_fn(ctx)?;
+    for arg in args {
+        ctx.command_line_mut().add_arg(arg);
+    }
     Ok(())
 }
 
@@ -387,12 +398,11 @@ pub fn exec_button_arg_prompt(
     description: &str,
     args: impl IntoIterator<Item = Arg>,
     page_action: PageAction,
-    arg_prompt: &'static str,
-    prompt_fn: impl Fn(&mut Context) -> Result<String> + 'static,
+    prompt_fn: impl Fn(&mut Context) -> Result<Vec<Arg>> + 'static,
 ) -> Button {
     let args: Vec<_> = args.into_iter().collect();
     button(key, description, move |mut ctx| {
-        let result = prompt_arg(&mut ctx, arg_prompt, &prompt_fn);
+        let result = prompt_arg(&mut ctx, &prompt_fn);
         let result = result.and_then(|_| exec_cmd(&mut ctx, args.clone()));
         match page_action {
             PageAction::Pop => {
