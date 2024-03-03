@@ -10,13 +10,16 @@ fn jj_status() -> anyhow::Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
+fn shell_cmd(bash_cmd: impl Into<String>) -> Command {
+    let mut cmd = std::process::Command::new("bash");
+    cmd.arg("-c");
+    cmd.arg(bash_cmd.into());
+    cmd
+}
+
 fn jj_select_rev(ctx: &mut Context) -> anyhow::Result<String> {
     ctx.leave_ui()?;
-    let output = std::process::Command::new("bash")
-        .arg("-c")
-        .arg(format!(
-            "jj log -r '::' --no-graph --color=always | fzf --ansi"
-        ))
+    let output = shell_cmd("jj log -r '::' --no-graph --color=always | fzf --ansi")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
