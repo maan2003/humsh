@@ -402,8 +402,11 @@ pub fn exec_button_arg_prompt(
 ) -> Button {
     let args: Vec<_> = args.into_iter().collect();
     button(key, description, move |mut ctx| {
-        let result = prompt_arg(&mut ctx, &prompt_fn);
-        let result = result.and_then(|_| exec_cmd(&mut ctx, args.clone()));
+        let mut run = || {
+            prompt_arg(&mut ctx, &prompt_fn)?;
+            exec_cmd(&mut ctx, args.clone())
+        };
+        let result = run();
         match page_action {
             PageAction::Pop => {
                 ctx.pop_page();
@@ -414,6 +417,31 @@ pub fn exec_button_arg_prompt(
     })
 }
 
+pub fn exec_button_arg_prompt2(
+    key: &'static str,
+    description: &str,
+    args: impl IntoIterator<Item = Arg>,
+    page_action: PageAction,
+    prompt_fn: impl Fn(&mut Context) -> Result<Vec<Arg>> + 'static,
+    prompt_fn2: impl Fn(&mut Context) -> Result<Vec<Arg>> + 'static,
+) -> Button {
+    let args: Vec<_> = args.into_iter().collect();
+    button(key, description, move |mut ctx| {
+        let mut run = || {
+            prompt_arg(&mut ctx, &prompt_fn)?;
+            prompt_arg(&mut ctx, &prompt_fn2)?;
+            exec_cmd(&mut ctx, args.clone())
+        };
+        let result = run();
+        match page_action {
+            PageAction::Pop => {
+                ctx.pop_page();
+            }
+            PageAction::None => {}
+        }
+        result
+    })
+}
 pub fn args_page(args: impl Into<Vec<Button>>, actions: impl Into<Vec<Button>>) -> Page {
     let args = args.into();
     if !args.is_empty() {
