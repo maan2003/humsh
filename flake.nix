@@ -7,7 +7,7 @@
         pname = "humsh";
         version = "0.1.0";
         src = inputs.self;
-        cargoHash = "sha256-EPqYCrOMSJ+gtUiUUlA5VnZRkny1in8GmU+UTu3W3k0=";
+        cargoHash = "sha256-zc4O2zelc1MgaqKotZzT0JniJ04pCSqKVIOIdYnw43k=";
       };
     };
     pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
