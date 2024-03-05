@@ -44,7 +44,7 @@ fn jj_select_branch(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Resul
     move |ctx| {
         ctx.leave_ui()?;
         let output = shell_cmd(format!(
-            "jj branch list --color=always | fzf --ansi --multi --prompt '{arg}'"
+            "jj branch list --color=always | fzf --ansi --multi --prompt '{arg}' --tiebreak=begin,index"
         ))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
