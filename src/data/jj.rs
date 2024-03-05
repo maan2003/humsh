@@ -21,7 +21,7 @@ fn jj_select_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<V
     move |ctx| {
         ctx.leave_ui()?;
         let output = shell_cmd(format!(
-            "jj log -r '::' --no-graph --color=always | fzf --ansi --multi --prompt '{arg}'"
+            "jj log -r '::' --no-graph --color=always | fzf --ansi --multi --prompt '{arg}' --tiebreak=begin,index"
         ))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
