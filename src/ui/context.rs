@@ -76,6 +76,8 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     pub fn push_page(&mut self, page: Page) {
+        let show = page.show_by_default;
+        self.show_pages(show);
         self.ui.stack.push((self.command_line().clone(), page));
     }
 
@@ -84,16 +86,21 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     pub fn replace_page(&mut self, page: Page) {
+        let show = page.show_by_default;
+        self.show_pages(show);
         *self.ui.currrent_page_mut() = page;
     }
 
     /// Returns whether page was poped.
     pub fn pop_page(&mut self) -> bool {
-        if self.ui.stack.len() > 1 {
+        let value = if self.ui.stack.len() > 1 {
             self.ui.stack.pop().is_some()
         } else {
             false
-        }
+        };
+        let show = self.ui.stack.first().map_or(false, |x| x.1.show_by_default);
+        self.show_pages(show);
+        value
     }
 
     pub fn showing_cmd(&self) -> bool {
@@ -110,6 +117,15 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn toggle_cmd(&mut self) -> anyhow::Result<()> {
         Ok(self.ui.toggle_cmd(self.stdout)?)
+    }
+
+    pub fn toggle_show_pages(&mut self) -> anyhow::Result<()> {
+        self.ui.showing_pages = !self.ui.showing_pages;
+        Ok(())
+    }
+    pub fn show_pages(&mut self, show: bool) -> anyhow::Result<()> {
+        self.ui.showing_pages = show;
+        Ok(())
     }
 
     pub fn exit(&mut self) {

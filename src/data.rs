@@ -20,6 +20,7 @@ pub struct Button {
     pub key: Keybind,
     pub description: String,
     pub handler: Arc<dyn ButtonHandler>,
+    pub hidden: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,7 @@ pub struct Group {
 #[derive(Clone)]
 pub struct Page {
     pub groups: Vec<Group>,
+    pub show_by_default: bool,
 }
 
 #[derive(Clone)]
@@ -110,11 +112,19 @@ impl Program {
 
 impl Page {
     pub fn empty() -> Self {
-        Self { groups: Vec::new() }
+        Self {
+            groups: Vec::new(),
+            show_by_default: false,
+        }
     }
 
     pub fn add_group(&mut self, group: Group) {
         self.groups.push(group);
+    }
+
+    pub fn show_by_default(mut self, show: bool) -> Self {
+        self.show_by_default = show;
+        self
     }
 }
 
@@ -237,6 +247,7 @@ impl PromptButton {
 pub fn page(groups: impl Into<Vec<Group>>) -> Page {
     Page {
         groups: groups.into(),
+        show_by_default: true,
     }
 }
 
@@ -256,6 +267,7 @@ pub fn button(
         key: Keybind(key.into()),
         description: description.into(),
         handler: Arc::new(handler),
+        hidden: false,
     }
 }
 
@@ -272,6 +284,7 @@ pub fn prompt_button(
             f: Box::new(handler),
             arg: name.to_string(),
         }),
+        hidden: false,
     }
 }
 
@@ -280,6 +293,19 @@ pub fn flag_button(key: &'static str, description: &str, flag: &'static str) -> 
         key: Keybind(key.into()),
         description: description.into(),
         handler: Arc::new(ToggleFlag(Cow::Borrowed(flag))),
+        hidden: false,
+    }
+}
+
+pub fn hidden_button(
+    key: &'static str,
+    handler: impl Fn(Context) -> anyhow::Result<()> + 'static,
+) -> Button {
+    Button {
+        key: Keybind(key.into()),
+        description: String::new(),
+        handler: Arc::new(handler),
+        hidden: true,
     }
 }
 

@@ -301,8 +301,13 @@ pub fn jj() -> anyhow::Result<Page> {
                 PageAction::None,
                 jj_prompt_rev("", RevSelector::Mutable),
             ),
+            hidden_button("?", |mut ctx| {
+                ctx.toggle_show_pages()?;
+                Ok(())
+            }),
         ],
-    )]);
+    )])
+    .show_by_default(false);
 
     Ok(page)
 }

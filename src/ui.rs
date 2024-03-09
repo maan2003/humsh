@@ -41,12 +41,14 @@ pub struct Ui {
     event_rx: flume::Receiver<Event>,
     background_tasks: BTreeMap<BgTaskId, String>,
     style: Style,
+    showing_pages: bool,
 }
 
 impl Ui {
     pub fn new(program: Program) -> anyhow::Result<Self> {
         let (event_tx, event_rx) = flume::bounded(10);
         Ok(Self {
+            showing_pages: program.start.show_by_default,
             program: program.clone(),
             stack: vec![(program.base, program.start)],
             key_handler: KeyHandler::new(),
@@ -270,7 +272,9 @@ impl Ui {
             terminal::Clear(terminal::ClearType::All)
         )?;
         self.draw_status(stdout)?;
-        self.draw_page(self.currrent_page(), stdout)?;
+        if self.showing_pages {
+            self.draw_page(self.currrent_page(), stdout)?;
+        }
 
         // if let Some(tabs) = tabs {
         //     self.draw_tabs(&tabs, stdout)?;
@@ -369,6 +373,9 @@ impl Ui {
             NextLine,
         )?;
         for button in &group.buttons {
+            if button.hidden {
+                continue;
+            }
             self.draw_button(button, stdout)?;
             queue!(stdout, NextLine)?;
         }
