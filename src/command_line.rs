@@ -22,9 +22,13 @@ pub struct ArgOrder(u64);
 
 impl ArgOrder {
     pub const PROGRAM: ArgOrder = ArgOrder(100);
-    pub const SUBCOMMAND: ArgOrder = ArgOrder(200);
+    pub const SUBCOMMAND_BASE: ArgOrder = ArgOrder(200);
     pub const FLAG: ArgOrder = ArgOrder(300);
     pub const POSITIONAL: ArgOrder = ArgOrder(400);
+
+    pub fn subcommand(level: u64) -> Self {
+        ArgOrder(ArgOrder::SUBCOMMAND_BASE.0 + level)
+    }
 
     pub fn custom(value: u64) -> Self {
         ArgOrder(value)
@@ -107,7 +111,11 @@ impl Arg {
     }
 
     pub fn subcommand(value: impl Into<String>) -> Self {
-        Arg::new(ArgOrder::SUBCOMMAND, ArgValue::Single(value.into()))
+        Arg::new(ArgOrder::SUBCOMMAND_BASE, ArgValue::Single(value.into()))
+    }
+
+    pub fn subcommand_order(value: impl Into<String>, order: u64) -> Self {
+        Arg::new(ArgOrder::subcommand(order), ArgValue::Single(value.into()))
     }
 
     pub fn subcommands<I>(values: I) -> Self
@@ -116,7 +124,7 @@ impl Arg {
         I::Item: Into<String>,
     {
         Arg::new(
-            ArgOrder::SUBCOMMAND,
+            ArgOrder::SUBCOMMAND_BASE,
             ArgValue::Multi(values.into_iter().map(|x| x.into()).collect()),
         )
     }

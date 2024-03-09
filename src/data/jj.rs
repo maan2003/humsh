@@ -74,6 +74,13 @@ fn jj_prompt_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<V
     }
 }
 
+fn jj_prompt_branch_name() -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
+    move |ctx| {
+        let branch = ctx.read_input("Branches")?;
+        Ok(vec![Arg::positional(branch)])
+    }
+}
+
 fn jj_prompt_branch(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
     move |ctx| {
         let revs = jj_select_branch(arg)(ctx)?;
@@ -204,41 +211,35 @@ pub fn jj() -> anyhow::Result<Page> {
             subcommand_page_button(
                 "b",
                 "Branch",
-                [],
+                ["branch"],
                 [],
                 [
-                    button("c", "Create", |mut ctx| {
-                        let revs = jj_prompt_rev("--revision=")(&mut ctx)?;
-                        let mut command_line = ctx.command_line().clone();
-                        command_line.args.extend(revs);
-                        let branch = ctx.read_input("Branches")?;
-                        command_line.add_arg(Arg::subcommands(["branch", "create"]));
-                        command_line.add_arg(Arg::positional(branch));
-                        ctx.run_command_line_other(&command_line)?;
-                        ctx.pop_page();
-                        Ok(())
-                    }),
-                    button("s", "Set", |mut ctx| {
-                        let revs = jj_prompt_rev("--revision=")(&mut ctx)?;
-                        let branch = jj_prompt_branch("")(&mut ctx)?;
-                        let mut command_line = ctx.command_line().clone();
-                        command_line.args.extend(revs);
-                        command_line.args.extend(branch);
-                        command_line.add_arg(Arg::subcommands(["branch", "set"]));
-                        command_line.add_arg(Arg::switch("--allow-backwards"));
-                        ctx.run_command_line_other(&command_line)?;
-                        ctx.pop_page();
-                        Ok(())
-                    }),
-                    button("d", "Delete", |mut ctx| {
-                        let branch = jj_prompt_branch("")(&mut ctx)?;
-                        let mut command_line = ctx.command_line().clone();
-                        command_line.args.extend(branch);
-                        command_line.add_arg(Arg::subcommands(["branch", "delete"]));
-                        ctx.run_command_line_other(&command_line)?;
-                        ctx.pop_page();
-                        Ok(())
-                    }),
+                    exec_button_arg_prompt2(
+                        "c",
+                        "Create",
+                        [Arg::subcommand_order("create", 1)],
+                        PageAction::Pop,
+                        jj_prompt_branch_name(),
+                        jj_prompt_rev("--revision="),
+                    ),
+                    exec_button_arg_prompt2(
+                        "s",
+                        "Set",
+                        [
+                            Arg::subcommand_order("set", 1),
+                            Arg::switch("--allow-backwards"),
+                        ],
+                        PageAction::Pop,
+                        jj_prompt_branch(""),
+                        jj_prompt_rev("--revision="),
+                    ),
+                    exec_button_arg_prompt(
+                        "d",
+                        "Delete",
+                        [Arg::subcommand_order("delete", 1)],
+                        PageAction::Pop,
+                        jj_prompt_branch(""),
+                    ),
                 ],
             ),
             exec_button_arg_prompt(
