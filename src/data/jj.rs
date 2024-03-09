@@ -271,6 +271,13 @@ pub fn jj() -> anyhow::Result<Page> {
                     jj_prompt_rev("--revision="),
                 )],
             ),
+            exec_button_arg_prompt(
+                "a",
+                "Abandon",
+                [Arg::subcommand("abandon")],
+                PageAction::None,
+                jj_prompt_rev(""),
+            ),
         ],
     )])
     .with_status(jj_status);
