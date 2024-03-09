@@ -1,3 +1,5 @@
+use std::str;
+
 use anyhow::Context as _;
 
 use super::*;
@@ -7,7 +9,14 @@ pub fn jj_status() -> anyhow::Result<String> {
         .arg("status")
         .arg("--color=always")
         .output()?;
-    Ok(String::from_utf8(output.stdout)?)
+    let output_log = Command::new("jj")
+        .arg("log")
+        .arg("--limit=5")
+        .arg("--color=always")
+        .output()?;
+    let output = String::from_utf8(output.stdout)?;
+    let log = String::from_utf8(output_log.stdout)?;
+    Ok(format!("{log}\n{output}"))
 }
 
 fn shell_cmd(bash_cmd: impl Into<String>) -> Command {
