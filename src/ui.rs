@@ -10,10 +10,10 @@ use tokio::runtime;
 use tokio_stream::StreamExt;
 
 use crate::command_line::CommandLine;
-use crate::data::{self, Button, ButtonHandler, ButtonValue, Group, Page};
+use crate::data::{Button, ButtonHandler, ButtonValue, Group, Page, Program};
 use crate::direnv::Direnv;
 use crate::multi_term::{self, MultiTerm, TabHandle};
-pub use context::{Context, ExternalContext, StatusId};
+pub use context::{BgTaskId, Context, ExternalContext};
 use input::KeyHandler;
 pub use style::Style;
 
@@ -26,26 +26,28 @@ pub type Stdout<'a, 'b> = &'a mut StdoutLock<'b>;
 #[derive(Debug)]
 pub enum Event {
     Term(crossterm::event::Event),
-    Status(StatusId, String),
-    RemoveStatus(StatusId),
+    Task(BgTaskId, String),
+    RemoveStatus(BgTaskId),
 }
 
 pub struct Ui {
     stack: Vec<(CommandLine, Page)>,
+    program: Program,
     key_handler: KeyHandler,
     direnv: Direnv,
     showing_cmd: bool,
     multi_term: Option<MultiTerm>,
     event_tx: flume::Sender<Event>,
     event_rx: flume::Receiver<Event>,
-    status: BTreeMap<StatusId, String>,
+    background_tasks: BTreeMap<BgTaskId, String>,
     style: Style,
 }
 
 impl Ui {
-    pub fn new(program: data::Program) -> anyhow::Result<Self> {
+    pub fn new(program: Program) -> anyhow::Result<Self> {
         let (event_tx, event_rx) = flume::bounded(10);
         Ok(Self {
+            program: program.clone(),
             stack: vec![(program.base, program.start)],
             key_handler: KeyHandler::new(),
             direnv: Direnv::new(
@@ -56,7 +58,7 @@ impl Ui {
             multi_term: multi_term::detect(),
             event_tx,
             event_rx,
-            status: BTreeMap::new(),
+            background_tasks: BTreeMap::new(),
             style: style::builtin(),
         })
     }
@@ -92,7 +94,7 @@ impl Ui {
         loop {
             terminal::enable_raw_mode()?;
             if !self.showing_cmd {
-                self.currrent_page_mut().refresh_status().ok();
+                self.program.refresh_status().ok();
                 self.draw(&mut stdout)?;
             }
             let event: anyhow::Result<_> = runtime::Handle::current().block_on(async {
@@ -215,12 +217,12 @@ impl Ui {
         match event {
             Event::Term(crossterm::event::Event::Key(key)) => self.handle_key(key),
             Event::Term(_) => Ok(None),
-            Event::Status(id, text) => {
-                self.status.insert(id, text);
+            Event::Task(id, text) => {
+                self.background_tasks.insert(id, text);
                 Ok(None)
             }
             Event::RemoveStatus(id) => {
-                self.status.remove(&id);
+                self.background_tasks.remove(&id);
                 Ok(None)
             }
         }
@@ -267,6 +269,7 @@ impl Ui {
             cursor::MoveTo(0, height - 1),
             terminal::Clear(terminal::ClearType::All)
         )?;
+        self.draw_status(stdout)?;
         self.draw_page(self.currrent_page(), stdout)?;
 
         // if let Some(tabs) = tabs {
@@ -288,7 +291,7 @@ impl Ui {
             stdout,
             PrintStyledContent(self.style.directory.apply(dir_name))
         )?;
-        self.draw_status(stdout)?;
+        self.draw_bg_status(stdout)?;
         queue!(
             stdout,
             PrintStyledContent(self.style.prompt_char),
@@ -297,6 +300,12 @@ impl Ui {
             Print(self.key_handler.prefix()),
         )?;
         Ok(())
+    }
+
+    fn draw_status(&self, stdout: Stdout) -> Result<(), anyhow::Error> {
+        Ok(if let Some(status) = self.program.status() {
+            execute!(stdout, Print(status.replace('\n', "\r\n")), NextLine)?;
+        })
     }
 
     fn draw_tabs(&self, tabs: &[TabHandle], stdout: Stdout) -> crossterm::Result<()> {
@@ -319,8 +328,8 @@ impl Ui {
         Ok(())
     }
 
-    fn draw_status(&self, stdout: Stdout) -> crossterm::Result<()> {
-        if self.status.is_empty() {
+    fn draw_bg_status(&self, stdout: Stdout) -> crossterm::Result<()> {
+        if self.background_tasks.is_empty() {
             return Ok(());
         }
 
@@ -330,7 +339,7 @@ impl Ui {
             Print(" "),
             PrintStyledContent(self.style.status.apply("["))
         )?;
-        for val in self.status.values() {
+        for val in self.background_tasks.values() {
             queue!(
                 stdout,
                 PrintStyledContent(self.style.status.apply(val.as_str()))
@@ -346,9 +355,6 @@ impl Ui {
     }
 
     fn draw_page(&self, page: &Page, stdout: Stdout) -> Result<(), std::io::Error> {
-        if let Some(status) = page.status() {
-            execute!(stdout, Print(status.replace('\n', "\r\n")), NextLine)?;
-        }
         for group in &page.groups {
             self.draw_group(group, stdout)?;
             queue!(stdout, NextLine)?;

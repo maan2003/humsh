@@ -30,8 +30,6 @@ pub struct Group {
 
 #[derive(Clone)]
 pub struct Page {
-    pub status: Option<Arc<dyn Fn() -> anyhow::Result<String>>>,
-    pub status_cache: Option<String>,
     pub groups: Vec<Group>,
 }
 
@@ -39,6 +37,8 @@ pub struct Page {
 pub struct Program {
     pub base: CommandLine,
     pub start: Page,
+    pub status: Option<Arc<dyn Fn() -> anyhow::Result<String>>>,
+    pub status_cache: Option<String>,
 }
 
 pub enum ButtonValue<'a> {
@@ -80,12 +80,13 @@ where
     }
 }
 
-impl Page {
-    pub fn empty() -> Self {
+impl Program {
+    pub fn new(base: CommandLine, start: Page) -> Self {
         Self {
+            base,
+            start,
             status: None,
             status_cache: None,
-            groups: Vec::new(),
         }
     }
 
@@ -104,6 +105,12 @@ impl Page {
 
     pub fn status(&self) -> Option<&str> {
         self.status_cache.as_deref()
+    }
+}
+
+impl Page {
+    pub fn empty() -> Self {
+        Self { groups: Vec::new() }
     }
 
     pub fn add_group(&mut self, group: Group) {
@@ -229,8 +236,6 @@ impl PromptButton {
 
 pub fn page(groups: impl Into<Vec<Group>>) -> Page {
     Page {
-        status: None,
-        status_cache: None,
         groups: groups.into(),
     }
 }
@@ -280,17 +285,15 @@ pub fn flag_button(key: &'static str, description: &str, flag: &'static str) -> 
 
 pub fn jj() -> anyhow::Result<Program> {
     let start = jj::jj()?;
-    Ok(Program {
-        base: CommandLine::from_iter([Arg::program("jj")]),
-        start,
-    })
+    Ok(
+        Program::new(CommandLine::from_iter([Arg::program("jj")]), start)
+            .with_status(jj::jj_status),
+    )
 }
+
 pub fn top() -> anyhow::Result<Program> {
     let start = home_page()?;
-    Ok(Program {
-        base: CommandLine::from_iter([]),
-        start,
-    })
+    Ok(Program::new(CommandLine::from_iter([]), start))
 }
 
 fn home_page() -> Result<Page, anyhow::Error> {

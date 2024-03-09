@@ -2,7 +2,7 @@ use anyhow::Context as _;
 
 use super::*;
 
-fn jj_status() -> anyhow::Result<String> {
+pub fn jj_status() -> anyhow::Result<String> {
     let output = Command::new("jj")
         .arg("status")
         .arg("--color=always")
@@ -302,8 +302,7 @@ pub fn jj() -> anyhow::Result<Page> {
                 jj_prompt_rev("", RevSelector::Mutable),
             ),
         ],
-    )])
-    .with_status(jj_status);
+    )]);
 
     Ok(page)
 }
