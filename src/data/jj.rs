@@ -17,11 +17,26 @@ fn shell_cmd(bash_cmd: impl Into<String>) -> Command {
     cmd
 }
 
-fn jj_select_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<String>> {
+#[derive(Clone, Copy, Debug)]
+enum RevSelector {
+    All,
+    Mutable,
+    NotInTrunk,
+}
+
+fn jj_select_rev(
+    arg: &'static str,
+    revs: RevSelector,
+) -> impl Fn(&mut Context) -> anyhow::Result<Vec<String>> {
+    let rev = match revs {
+        RevSelector::All => "::",
+        RevSelector::Mutable => ":: & ~::immutable_heads()",
+        RevSelector::NotInTrunk => "trunk()..",
+    };
     move |ctx| {
         ctx.leave_ui()?;
         let output = shell_cmd(format!(
-            "jj log -r '::' --no-graph --color=always | fzf --ansi --multi --prompt '{arg}' --tiebreak=begin,index"
+            "jj log -r '{rev}' --no-graph --color=always | fzf --ansi --multi --prompt '{arg}' --tiebreak=begin,index"
         ))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -63,9 +78,12 @@ fn jj_select_branch(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Resul
     }
 }
 
-fn jj_prompt_rev(arg: &'static str) -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
+fn jj_prompt_rev(
+    arg: &'static str,
+    revs: RevSelector,
+) -> impl Fn(&mut Context) -> anyhow::Result<Vec<Arg>> {
     move |ctx| {
-        let revs = jj_select_rev(arg)(ctx)?;
+        let revs = jj_select_rev(arg, revs)(ctx)?;
         let mut args = vec![];
         for rev in revs {
             args.push(Arg::switch(format!("{arg}{rev}")));
@@ -114,7 +132,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         "Change",
                         [],
                         PageAction::Pop,
-                        jj_prompt_rev("--change="),
+                        jj_prompt_rev("--change=", RevSelector::NotInTrunk),
                     ),
                 ],
             ),
@@ -137,7 +155,7 @@ pub fn jj() -> anyhow::Result<Page> {
                     "Describe",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev(""),
+                    jj_prompt_rev("", RevSelector::Mutable),
                 )],
             ),
             exec_button("l", "Log", [Arg::subcommand("log")], PageAction::None),
@@ -155,7 +173,7 @@ pub fn jj() -> anyhow::Result<Page> {
                     "New",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev(""),
+                    jj_prompt_rev("", RevSelector::All),
                 )],
             ),
             subcommand_page_button(
@@ -168,7 +186,7 @@ pub fn jj() -> anyhow::Result<Page> {
                     "Squash",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev("--revision="),
+                    jj_prompt_rev("--revision=", RevSelector::Mutable),
                 )],
             ),
             subcommand_page_button(
@@ -186,14 +204,19 @@ pub fn jj() -> anyhow::Result<Page> {
                     flag_button("i", "Interactive", "--interactive"),
                     flag_button("e", "Skip Empty", "--skip-empty"),
                     prompt_button("b", "Branch", "--branch", jj_select_branch("--branch=")),
-                    prompt_button("s", "Source", "--source", jj_select_rev("--source=")),
+                    prompt_button(
+                        "s",
+                        "Source",
+                        "--source",
+                        jj_select_rev("--source=", RevSelector::Mutable),
+                    ),
                 ],
                 [exec_button_arg_prompt(
                     "r",
                     "Rebase",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev("--destination="),
+                    jj_prompt_rev("--destination=", RevSelector::All),
                 )],
             ),
             subcommand_page_button(
@@ -206,8 +229,8 @@ pub fn jj() -> anyhow::Result<Page> {
                     "Move",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev("--from="),
-                    jj_prompt_rev("--to="),
+                    jj_prompt_rev("--from=", RevSelector::Mutable),
+                    jj_prompt_rev("--to=", RevSelector::Mutable),
                 )],
             ),
             subcommand_page_button(
@@ -222,7 +245,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         [Arg::subcommand_order("create", 1)],
                         PageAction::Pop,
                         jj_prompt_branch_name(),
-                        jj_prompt_rev("--revision="),
+                        jj_prompt_rev("--revision=", RevSelector::All),
                     ),
                     exec_button_arg_prompt2(
                         "s",
@@ -233,7 +256,7 @@ pub fn jj() -> anyhow::Result<Page> {
                         ],
                         PageAction::Pop,
                         jj_prompt_branch(""),
-                        jj_prompt_rev("--revision="),
+                        jj_prompt_rev("--revision=", RevSelector::All),
                     ),
                     exec_button_arg_prompt(
                         "d",
@@ -249,14 +272,14 @@ pub fn jj() -> anyhow::Result<Page> {
                 "Edit",
                 [Arg::subcommand("edit")],
                 PageAction::None,
-                jj_prompt_rev(""),
+                jj_prompt_rev("", RevSelector::Mutable),
             ),
             exec_button_arg_prompt(
                 "s",
                 "Show",
                 [Arg::subcommand("show")],
                 PageAction::None,
-                jj_prompt_rev(""),
+                jj_prompt_rev("", RevSelector::All),
             ),
             subcommand_page_button(
                 "o",
@@ -268,7 +291,7 @@ pub fn jj() -> anyhow::Result<Page> {
                     "Obs Log",
                     [],
                     PageAction::Pop,
-                    jj_prompt_rev("--revision="),
+                    jj_prompt_rev("--revision=", RevSelector::All),
                 )],
             ),
             exec_button_arg_prompt(
@@ -276,7 +299,7 @@ pub fn jj() -> anyhow::Result<Page> {
                 "Abandon",
                 [Arg::subcommand("abandon")],
                 PageAction::None,
-                jj_prompt_rev(""),
+                jj_prompt_rev("", RevSelector::Mutable),
             ),
         ],
     )])
