@@ -103,6 +103,9 @@ pub fn jj() -> anyhow::Result<Page> {
                 [
                     flag_button("d", "Deleted", "--deleted"),
                     flag_button("n", "Dry run", "--dry-run"),
+                    flag_button("t", "Tracked", "--tracked"),
+                    flag_button("a", "All", "--all"),
+                    prompt_button("b", "Branch", "--branch", jj_select_branch("--branch=")),
                 ],
                 [
                     exec_button("p", "Push", [], PageAction::Pop),
@@ -121,9 +124,8 @@ pub fn jj() -> anyhow::Result<Page> {
                 [Arg::subcommands(["git", "fetch"])],
                 PageAction::None,
             ),
-            exec_button("d", "Diff", [Arg::subcommand("diff")], PageAction::None),
             subcommand_page_button(
-                "D",
+                "d",
                 "Describe",
                 ["desc"],
                 [
@@ -131,7 +133,7 @@ pub fn jj() -> anyhow::Result<Page> {
                     flag_button("E", "No Edit", "--no-edit"),
                 ],
                 [exec_button_arg_prompt(
-                    "D",
+                    "d",
                     "Describe",
                     [],
                     PageAction::Pop,
@@ -249,9 +251,26 @@ pub fn jj() -> anyhow::Result<Page> {
                 PageAction::None,
                 jj_prompt_rev(""),
             ),
-            button("s", "Refresh status", |mut ctx| {
-                ctx.currrent_page_mut().refresh_status()
-            }),
+            exec_button_arg_prompt(
+                "s",
+                "Show",
+                [Arg::subcommand("show")],
+                PageAction::None,
+                jj_prompt_rev(""),
+            ),
+            subcommand_page_button(
+                "o",
+                "Obs Log",
+                ["obslog"],
+                [flag_button("p", "Patch", "--patch")],
+                [exec_button_arg_prompt(
+                    "o",
+                    "Obs Log",
+                    [],
+                    PageAction::Pop,
+                    jj_prompt_rev("--revision="),
+                )],
+            ),
         ],
     )])
     .with_status(jj_status);
