@@ -413,7 +413,7 @@ impl Ui {
             stdout,
             cursor::MoveToColumn(0),
             terminal::Clear(terminal::ClearType::CurrentLine),
-            Print(format!("{prompt}= "))
+            Print(format!("{prompt}: "))
         )?;
         terminal::disable_raw_mode()?;
         let mut buf = String::new();
